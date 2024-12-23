@@ -18,6 +18,10 @@ For iOS, install the CocoaPods dependencies by running below command. Supports i
 cd ios && pod install
 ```
 
+## Official Documentation
+
+For more detailed documentation, please refer [here](https://developers.vwo.com/v2/docs/fme-react-native-install).
+
 ## Basic Usage
 
 ```dart
