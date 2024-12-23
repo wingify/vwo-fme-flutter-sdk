@@ -19,7 +19,7 @@ import UIKit
 import VWO_FME
 
 //Constants
-private let SDK_VERSION = "1.0.0"
+private let SDK_VERSION = "1.1.0"
 private let SDK_NAME = "vwo-fme-flutter-sdk"
 
 // Plugin constants
@@ -63,7 +63,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         switch call.method {
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
-            
+
         case INITIALIZE_VWO:
             initializeVWO(call, result: result)
         case IOS_GET_FLAG:
@@ -72,7 +72,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             trackEvent(call, result: result)
         case IOS_SET_ATTRIBUTE:
             setAttribute(call, result: result)
-            
+
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -90,18 +90,18 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "sdkKey and accountId are required", details: nil))
             return
         }
-        
+
         let logger = args["logger"] as? [String: Any]
         let gatewayService = args["gatewayService"] as? [String: Any]
         let pollInterval: Int64? = args["pollInterval"] as? Int64 ?? nil
         let cachedSettingsExpiryTime: Int64? = args["cachedSettingsExpiryTime"] as? Int64 ?? nil
-        
+
         var logLevel: LogLevelEnum = .error
         if let loggerLevel = logger?["level"] as? String,
            let level = LogLevelEnum(rawValue: loggerLevel.uppercased()) {
             logLevel = level
         }
-        
+
         let vwoOptions = VWOInitOptions(sdkKey: sdkKey,
                                         accountId: accountId,
                                         logLevel: logLevel,
@@ -111,7 +111,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                         pollInterval: pollInterval,
                                         sdkName: SDK_VERSION,
                                         sdkVersion: SDK_NAME)
-        
+
         VWOFme.initialize(options: vwoOptions) { initResult in
             switch initResult {
             case .success(let message):
@@ -173,12 +173,12 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "eventName and context are required", details: nil))
             return
         }
-        
+
         let eventProperties = args["eventProperties"] as? [String: Any]
-        
+
         let vwoContext = VWOContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        
+
         // Call the VWO SDK's trackEvent method
         if let properties = eventProperties {
             VWOFme.trackEvent(eventName: eventName, context: vwoContext, eventProperties: properties)
@@ -202,7 +202,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "attributeKey, attributeValue, and context are required", details: nil))
             return
         }
-        
+
         let vwoContext = VWOContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
         VWOFme.setAttribute(attributeKey: attributeKey, attributeValue: attributeValue, context: vwoContext)

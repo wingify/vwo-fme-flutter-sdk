@@ -32,7 +32,7 @@ import com.vwo.interfaces.integration.IntegrationCallback
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.MethodChannel
 
-const val SDK_VERSION = "1.0.0"
+const val SDK_VERSION = "1.1.0"
 const val SDK_NAME = "vwo-fme-flutter-sdk"
 
 /**

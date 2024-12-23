@@ -3,7 +3,7 @@ description: FME is a server-side solution where you integrate VWO's SDK in your
 #Update version in VWOBridge.kt->SDK_VERSION and VwoFmeFlutterSdkPlugin.swift as well.
 #1.0.0: This is the version name (Major.Minor.Patch).
 #+1: This is the build number, which must increase for every App Store submission.
-version: 1.0.0+1
+version: 1.1.0+1
 homepage: https://vwo.com
 publish_to: none
 

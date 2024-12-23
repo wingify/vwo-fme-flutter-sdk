@@ -27,6 +27,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
+    namespace 'com.vwo.vwo_fme_flutter_sdk'
+
     compileSdkVersion 31
 
     compileOptions {
