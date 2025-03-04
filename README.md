@@ -10,7 +10,7 @@ Add below dependency in your project's `pubspec.yaml`.
 vwo_fme_flutter_sdk: <latest version>
 ```
 
-Latest version of SDK can be found in [pub.dev](https://pub.dev/packages/vwo-fme-flutter-sdk)
+Latest version of SDK can be found in [pub.dev](https://pub.dev/packages/vwo_fme_flutter_sdk)
 
 For iOS, install the CocoaPods dependencies by running below command. Supports iOS version 12.0 and above.
 
