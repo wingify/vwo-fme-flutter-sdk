@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import UIKit
 import VWO_FME
 
 //Constants
-private let SDK_VERSION = "1.1.0"
+private let SDK_VERSION = "1.4.0"
 private let SDK_NAME = "vwo-fme-flutter-sdk"
 
 // Plugin constants
@@ -27,6 +27,7 @@ private let INITIALIZE_VWO = "init"
 private let IOS_GET_FLAG = "getFlag" // Use IOS_ prefix for iOS-specific constants
 private let IOS_TRACK_EVENT = "trackEvent" // Use IOS_ prefix for iOS-specific constants
 private let IOS_SET_ATTRIBUTE = "setAttribute"
+private let IOS_SET_SESSION = "setSessionData"
 
 /// The VWO FME Flutter SDK plugin for iOS.
 ///
@@ -39,10 +40,12 @@ private let IOS_SET_ATTRIBUTE = "setAttribute"
 /// - Setting user attributes
 ///
 /// To use this plugin, add `vwo_fme_flutter_sdk` as a dependency in your pubspec.yaml file.
-public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallback  {
+public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallback, LogTransport {
 
     /// The Flutter method channel used to communicate with the Flutter framework.
     private var methodChannel: FlutterMethodChannel?
+
+    private var logTransport: LogTransport?
 
     /// Registers the plugin with the Flutter framework.
     /// - Parameter registrar: The Flutter plugin registrar.
@@ -72,6 +75,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             trackEvent(call, result: result)
         case IOS_SET_ATTRIBUTE:
             setAttribute(call, result: result)
+        case IOS_SET_SESSION:
+            setSessionData(call, result: result)
 
         default:
             result(FlutterMethodNotImplemented)
@@ -95,22 +100,39 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let gatewayService = args["gatewayService"] as? [String: Any]
         let pollInterval: Int64? = args["pollInterval"] as? Int64 ?? nil
         let cachedSettingsExpiryTime: Int64? = args["cachedSettingsExpiryTime"] as? Int64 ?? nil
+        let batchMinSize = args["batchMinSize"] as? Int ?? nil
+
+        var batchUploadTimeInterval: Int64 = -1
+        if let batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String {
+            batchUploadTimeInterval = Int64(batchUploadTimeIntervalString) ?? -1
+        }
 
         var logLevel: LogLevelEnum = .error
         if let loggerLevel = logger?["level"] as? String,
            let level = LogLevelEnum(rawValue: loggerLevel.uppercased()) {
             logLevel = level
         }
+        
+        // Initialize the logger
+        if let logger = logger, let transports = logger["transports"] as? [[String: Any]], !transports.isEmpty {
+            self.logTransport = self
+        }
+
+        let logPrefix = logger?["prefix"] as? String ?? ""
 
         let vwoOptions = VWOInitOptions(sdkKey: sdkKey,
                                         accountId: accountId,
                                         logLevel: logLevel,
+                                        logPrefix: logPrefix,
                                         integrations: self,
                                         gatewayService: gatewayService ?? [:],
                                         cachedSettingsExpiryTime: cachedSettingsExpiryTime,
                                         pollInterval: pollInterval,
+                                        batchMinSize: batchMinSize == -1 ? nil : batchMinSize,
+                                        batchUploadTimeInterval: batchUploadTimeInterval == -1 ? nil : batchUploadTimeInterval,
                                         sdkName: SDK_VERSION,
-                                        sdkVersion: SDK_NAME)
+                                        sdkVersion: SDK_NAME,
+                                        logTransport: self.logTransport)
 
         VWOFme.initialize(options: vwoOptions) { initResult in
             switch initResult {
@@ -126,7 +148,16 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
     ///
     /// - Parameter properties: The properties to pass to the callback.
     public func execute(_ properties: [String: Any]) {
-            methodChannel?.invokeMethod("onIntegrationCallback", arguments: properties)
+        methodChannel?.invokeMethod("onIntegrationCallback", arguments: properties)
+    }
+    
+    /// LogTransport implementation
+    public func log(logType: String, message: String) {
+        let properties = [
+            "level": logType,
+            "message": message
+        ]
+        methodChannel?.invokeMethod("onLoggerCallback", arguments: properties)
     }
 
     /// Gets the value of a feature flag.
@@ -196,8 +227,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
     ///   - result: The result callback.
     private func setAttribute(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let attributeKey = args["attributeKey"] as? String,
-              let attributeValue = args["attributeValue"],
+              let attributes = args["attributes"] as? [String: Any],
               let context = args["context"] as? [String: Any] else {
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "attributeKey, attributeValue, and context are required", details: nil))
             return
@@ -205,7 +235,23 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
 
         let vwoContext = VWOContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        VWOFme.setAttribute(attributeKey: attributeKey, attributeValue: attributeValue, context: vwoContext)
+        VWOFme.setAttribute(attributes: attributes, context: vwoContext)
         result(true)
+    }
+
+    /// Function to set the session data.
+    ///
+    /// - Parameters:
+    /// - call: The method call.
+    /// - result: The result callback.
+    private func setSessionData(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if let sessionData = call.arguments as? [String: Any] {
+            FmeConfig.setSessionData(sessionData)
+            result(nil)
+        } else {
+            result(FlutterError(code: "INVALID_ARGUMENT",
+            message: "Session data is null",
+            details: nil))
+        }
     }
 }

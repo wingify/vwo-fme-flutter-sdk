@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,16 @@ import com.vwo.interfaces.IVwoListener
 import com.vwo.models.user.GetFlag
 import com.vwo.models.user.VWOContext
 import com.vwo.models.user.GatewayService
+import com.vwo.interfaces.logger.LogTransport
+import com.vwo.packages.logger.enums.LogLevelEnum
+import com.vwo.models.user.FMEConfig
 import com.vwo.models.Variable
 import com.vwo.interfaces.integration.IntegrationCallback
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.MethodChannel
+import kotlin.text.toLongOrNull
 
-const val SDK_VERSION = "1.1.0"
+const val SDK_VERSION = "1.4.0"
 const val SDK_NAME = "vwo-fme-flutter-sdk"
 
 /**
@@ -68,11 +72,14 @@ class VWOBridge(private val context: Context) {
             return
         }
 
-        val logger = args["logger"] as? Map<*, *>
+        val logger = args["logger"] as? Map<String, Any>
         val gatewayServiceMap = args["gatewayService"] as? Map<*, *>
         val pollInterval = (args["pollInterval"] as? Int) ?: 0
         val cachedSettingsExpiryTime = (args["cachedSettingsExpiryTime"] as? Int) ?: 0
         val loggerLevel = args["loggerLevel"] as? String ?: "TRACE"
+        val batchMinSize = (args["batchMinSize"] as? Int) ?: -1
+        val batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String
+        val batchUploadTimeInterval = batchUploadTimeIntervalString?.toLongOrNull() ?: -1L
 
         val vwoInitOptions = VWOInitOptions().apply {
             this.sdkKey = sdkKey
@@ -83,6 +90,8 @@ class VWOBridge(private val context: Context) {
                 map["level"]?.let { loggerMap["level"] = it }
                 map["prefix"]?.let { loggerMap["prefix"] = it }
                 map["dateTimeFormat"]?.let { loggerMap["dateTimeFormat"] = it }
+
+                setLogger(map, loggerMap, channel)
                 this.logger = loggerMap
             }
             gatewayServiceMap?.let { map ->
@@ -97,6 +106,12 @@ class VWOBridge(private val context: Context) {
             }
             if (cachedSettingsExpiryTime > 0) {
                 this.cachedSettingsExpiryTime = cachedSettingsExpiryTime
+            }
+            if (batchMinSize > 0) {
+                this.batchMinSize = batchMinSize
+            }
+            if (batchUploadTimeInterval > 0) {
+                this.batchUploadTimeInterval = batchUploadTimeInterval
             }
             this.context = this@VWOBridge.context.applicationContext
             this.sdkVersion = SDK_VERSION
@@ -125,6 +140,54 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
+     * Sets up a logger for the FME SDK to forward log messages to Flutter.
+     *
+     * This function configures a logging mechanism that captures log messages
+     * from the native (Android) side and sends them to the Flutter side via a
+     * [MethodChannel]. It checks if the provided map contains a "transports" key
+     * and if the corresponding value is a non-empty map. If these conditions are
+     * met, it creates a [LogTransport] implementation that invokes the
+     * "onLoggerCallback" method on the Flutter side with the log message details.
+     *
+     * The log messages are sent to the Flutter side on the main thread to ensure
+     * they are handled correctly in the Flutter environment.
+     *
+     * @param map A map containing configuration details, including a "transports" key.
+     * @param outMap A mutable map where the configured logger will be added under the "transports" key.
+     * @param channel The [MethodChannel] used to communicate with the Flutter side.
+     */
+    private fun setLogger(
+        map: Map<String, Any>,
+        outMap: MutableMap<String, Any>,
+        channel: MethodChannel
+    ) {
+        if (map["transports"] == null) return
+
+        val logListener = map["transports"] as? Map<String, Any>
+        if (logListener?.isEmpty() == true) return
+
+        val nativeTransport: MutableMap<String, Any> = mutableMapOf()
+        nativeTransport["defaultTransport"] = object : LogTransport {
+            override fun log(level: LogLevelEnum, message: String?) {
+                if (message == null) return
+                //Log.d("FME", message)
+                Handler(Looper.getMainLooper()).post {
+
+                    val properties = mapOf<String, Any>(
+                        "level" to level.name,
+                        "message" to message
+                    )
+                    channel.invokeMethod("onLoggerCallback", properties)
+                }
+            }
+        }
+
+        val nativeLogger: MutableList<Map<String, Any>> = mutableListOf()
+        nativeLogger.add(nativeTransport)
+        outMap["transports"] = nativeLogger
+    }
+
+    /**
      * This method is used to get the flag value for the given feature key
      */
     fun getFlag(call: MethodCall, result: Result) {
@@ -144,7 +207,6 @@ class VWOBridge(private val context: Context) {
                 id = userContextMap["id"] as? String
                 userAgent = userContextMap["userAgent"] as? String ?: ""
                 ipAddress = userContextMap["ipAddress"] as? String ?: ""
-                sessionId = (userContextMap["sessionId"] as? Number)?.toLong() ?: 0L
                 customVariables.putAll(userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap())
                 variationTargetingVariables.putAll(userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap())
             }
@@ -266,20 +328,19 @@ class VWOBridge(private val context: Context) {
      * This method validates the types of the inputs before proceeding with the API call.
      */
     fun setAttribute(call: MethodCall, result: Result) {
-        val attributeKey = call.argument<String>("attributeKey")
-        val attributeValue = call.argument<Any>("attributeValue")
+        val attributes = call.argument<Map<String, Any>>("attributes")
         val contextMap = call.argument<Map<String, Any>>("context")
 
-        if (attributeKey.isNullOrBlank() || attributeValue == null || contextMap == null) {
+        if (attributes == null || contextMap == null) {
             result.error(
                 "INVALID_ARGUMENTS",
-                "Attribute key, attributeValue and context must not be null or empty",
+                "Attributes and context must not be null or empty",
                 null
             )
             return
         }
 
-        handleSetAttribute(attributeKey, attributeValue, contextMap, result)
+        handleSetAttribute(attributes, contextMap, result)
     }
 
     /**
@@ -287,8 +348,7 @@ class VWOBridge(private val context: Context) {
     * This method validates the types of the inputs before proceeding with the API call.
     */
     private fun handleSetAttribute(
-        attributeKey: String,
-        attributeValue: Any,
+        attributes: Map<String, Any>,
         contextMap: Map<String, Any>,
         result: Result
     ) {
@@ -306,7 +366,7 @@ class VWOBridge(private val context: Context) {
             }
 
             // Call the setAttribute method
-            vwo?.setAttribute(attributeKey, attributeValue, context)
+            vwo?.setAttribute(attributes, context)
             result.success(true) // Return success to Flutter
         } catch (e: Exception) {
             result.error(
@@ -355,5 +415,19 @@ class VWOBridge(private val context: Context) {
         }
 
         return filteredMap
+    }
+
+    /**
+     * Function to set the session data.
+     */
+    fun setSessionData(call: MethodCall, result: Result) {
+
+        val sessionData = call.arguments<Map<String, Any>>()
+        if (sessionData != null && sessionData.isNotEmpty()) {
+            FMEConfig.setSessionData(sessionData)
+            result.success(null)
+        } else {
+            result.error("INVALID_ARGUMENT", "Session data is null", null)
+        }
     }
 }

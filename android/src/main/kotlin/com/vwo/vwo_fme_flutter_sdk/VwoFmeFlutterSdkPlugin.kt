@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,11 +49,9 @@ class VwoFmeFlutterSdkPlugin : FlutterPlugin, MethodCallHandler {
             "getPlatformVersion" -> {
                 result.success("Android ${android.os.Build.VERSION.RELEASE}")
             }
-
             VWOConstants.INITIALIZE_VWO -> {
                 bridge?.initializeVWO(call, result, channel)
             }
-
             VWOConstants.ANDROID_GET_FLAG -> {
                 bridge?.getFlag(call, result)
             }
@@ -63,7 +61,9 @@ class VwoFmeFlutterSdkPlugin : FlutterPlugin, MethodCallHandler {
             VWOConstants.ANDROID_SET_ATTRIBUTE -> {
                 bridge?.setAttribute(call, result)
             }
-
+            VWOConstants.ANDROID_SET_SESSION -> {
+                bridge?.setSessionData(call, result)
+            }
             else -> {
                 result.notImplemented()
             }

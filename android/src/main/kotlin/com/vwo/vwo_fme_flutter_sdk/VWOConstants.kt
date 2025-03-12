@@ -1,5 +1,5 @@
 /**
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,4 +22,5 @@ object VWOConstants {
     const val ANDROID_GET_FLAG = "getFlag"
     const val ANDROID_TRACK_EVENT = "trackEvent"
     const val ANDROID_SET_ATTRIBUTE = "setAttribute"
+    const val ANDROID_SET_SESSION = "setSessionData"
 }

@@ -15,7 +15,7 @@ Latest version of SDK can be found in [pub.dev](https://pub.dev/packages/vwo-fme
 For iOS, install the CocoaPods dependencies by running below command. Supports iOS version 12.0 and above.
 
 ```bash
-cd ios && pod install
+cd example/ios && pod install
 ```
 
 ## Official Documentation
@@ -63,11 +63,15 @@ final trackingResult = await vwoClient?.trackEvent(
   context: userContext,
 );
 
-// Set a user attribute with the given key, value, and user context.
-final success = await vwoClient?.setAttribute(
-  attributeKey: attributeName,
-  attributeValue: attributeValue,
-  context: userContext,
+// Set a user attributes with the given key, value, and user context.
+var attributes = {
+  'userType': 'free',
+  'price': 99,
+  "isEnterpriseCustomer": false
+};
+await vwoClient?.setAttribute(
+  attributes: attributes,
+  vwoContext: vwoContext,
 );
 ```
 
@@ -91,4 +95,4 @@ Please go through our [contributing guidelines](https://github.com/wingify/vwo-f
 
 [Apache License, Version 2.0](https://github.com/wingify/vwo-fme-flutter-sdk/blob/master/LICENSE)
 
-Copyright 2024 Wingify Software Pvt. Ltd.
+Copyright 2024-2025 Wingify Software Pvt. Ltd.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,16 +70,17 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
 
   /// Sets a user attribute.
   ///
-  /// [attributeKey] The key of the attribute.
-  /// [attributeValue] The value of the attribute.
+  /// [attributes] The map of the attributes.
   /// [context] The user context for the attribute.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
-  Future<bool> setAttribute({
-    required String attributeKey,
-    required dynamic attributeValue,
-    required VWOContext vwoContext,
-  }) {
+  Future<bool> setAttribute(
+      {required Map<String, dynamic> attributes,
+      required VWOContext userContext}) {
     throw UnimplementedError('setAttribute() has not been implemented.');
+  }
+
+  Future<bool> setSessionData(Map<String, dynamic> sessionData){
+    throw UnimplementedError('setSessionData() has not been implemented.');
   }
 }

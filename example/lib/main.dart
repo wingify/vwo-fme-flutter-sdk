@@ -1,4 +1,4 @@
-/// Copyright 2024 Wingify Software Pvt. Ltd.
+/// Copyright 2024-2025 Wingify Software Pvt. Ltd.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
 import 'package:vwo_fme_flutter_sdk/vwo.dart';
 import 'package:vwo_fme_flutter_sdk_example/constants/constants.dart';
+import 'package:vwo_fme_flutter_sdk_example/logger/dart_logger.dart';
 
 void main() {
   runApp(const MyApp());
@@ -49,17 +50,23 @@ class _MyAppState extends State<MyApp> {
 
   /// Initializes VWO-FME sdk sending the desired parameters to native SDK.
   void _vwoInit() async {
+    // Create a list of transports
+    var transport = <String, dynamic>{};
+    transport["defaultTransport"] = DartLogger();
 
-    var initOptions = VWOInitOptions(sdkKey: sdkKey,
-      accountId: accountId,
-        logger: {
-          // "level": "ERROR",
-          "level": "DEBUG",
-        },
+    var logger = <Map<String, dynamic>>[];
+    logger.add(transport);
+
+    var initOptions = VWOInitOptions(
+        sdkKey: sdkKey,
+        accountId: accountId,
+        logger: {"level": "TRACE", "transports": logger},
         /*gatewayService: {
               "url": "http://localhost:8000",
             },*/
         //pollInterval: 10000,
+        //batchMinSize: 4,
+        //batchUploadTimeInterval: 3 * 60 * 1000,
         integrationCallback: (Map<String, dynamic> properties) {
           print('VWO: Integration callback received: $properties');
         });
@@ -116,16 +123,16 @@ class _MyAppState extends State<MyApp> {
 
   /// Sets an attribute for a user in the vwoContext provided.
   void _setAttribute() async {
+
+    var attributes = {
+      'userType': 'free',
+      'price': 99,
+      "isEnterpriseCustomer": false
+    };
     final success = await _vwo?.setAttribute(
-      attributeKey: attributeName,
-      attributeValue: attributeValue,
+      attributes: attributes,
       vwoContext: vwoContext,
     );
-    if (success != null && success) {
-      print("VWO: Attribute set successfully!");
-    } else {
-      print("VWO: Failed to set attribute.");
-    }
   }
 
   @override

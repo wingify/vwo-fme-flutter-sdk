@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,8 +115,7 @@ class VWO {
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   Future<bool>? setAttribute({
-    required String attributeKey,
-    required dynamic attributeValue,
+    required Map<String, dynamic> attributes,
     required VWOContext vwoContext,
   }) async {
     try {
@@ -124,9 +123,8 @@ class VWO {
       if (plugin == null) return false;
 
       return plugin.setAttribute(
-          attributeKey: attributeKey,
-          attributeValue: attributeValue,
-          vwoContext: vwoContext);
+          attributes: attributes,
+          userContext: vwoContext);
     } catch (e) {
       String details;
       if (e is PlatformException) {

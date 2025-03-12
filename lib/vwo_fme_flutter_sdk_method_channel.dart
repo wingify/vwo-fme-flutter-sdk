@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
 
+import 'logger/log_transport.dart';
 import 'vwo_fme_flutter_sdk_platform_interface.dart';
 
 /// An implementation of [VwoFmeFlutterSdkPlatform] that uses method channels.
@@ -28,29 +29,37 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   @visibleForTesting
   static const methodChannel = MethodChannel('vwo_fme_flutter_sdk');
 
-  /// Initializes the VWO SDK.
-  ///
-  /// This method should be called before any other VWO methods.
-  ///
-  /// [sdkKey] The SDK key for your VWO account.
-  /// [accountId] The account ID for your VWO account.
-  /// [logger] Optional logger configuration.
-  /// [gatewayService] Optional gateway service configuration.
-  /// [pollInterval] Optional poll interval for settings updates (in milliseconds).
-  /// [cachedSettingsExpiryTime] Optional expiry time for cached settings (in milliseconds).
-  ///
-  /// Returns a [Future] that resolves to a string indicating the initialization status.
-  static Future<MethodChannelVwoFmeFlutterSdk?> init(VWOInitOptions options) async {
+  List<Map<String, dynamic>>? _transports;
 
-      // Validate required parameters
-      if (options.sdkKey.isEmpty) {
-        return Future.error(
-            ArgumentError('sdkKey is required and cannot be empty'));
-      }
-      if (options.accountId <= 0) {
-        return Future.error(ArgumentError(
-            'accountId is required and must be a positive integer'));
-      }
+  /// Initializes the VWO FME Flutter SDK.
+  ///
+  /// This method is the entry point for setting up and configuring the VWO FME
+  /// Flutter SDK. It establishes communication with the native SDKs (Android/iOS)
+  /// and prepares the SDK for use.
+  ///
+  /// This method should be called once during the application's startup.
+  ///
+  /// [options] The initialization options for the VWO FME SDK. This object
+  ///           contains configuration details such as the account ID,
+  ///           environment key, and other settings.
+  ///
+  /// Returns a [Future] that completes with an instance of
+  /// [MethodChannelVwoFmeFlutterSdk] if the initialization is successful,
+  /// or error if the initialization fails.
+  static Future<MethodChannelVwoFmeFlutterSdk?> init(
+      VWOInitOptions options) async {
+
+    // Validate required parameters
+    if (options.sdkKey.isEmpty) {
+      return Future.error(
+          ArgumentError('sdkKey is required and cannot be empty'));
+    }
+    if (options.accountId <= 0) {
+      return Future.error(ArgumentError(
+          'accountId is required and must be a positive integer'));
+    }
+    List<Map<String, dynamic>> transportsCopy =
+        _prepareLoggersForBridge(options);
 
       final parameters = {
         'sdkKey': options.sdkKey,
@@ -59,29 +68,105 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
         'gatewayService': options.gatewayService,
         'pollInterval': options.pollInterval,
         'cachedSettingsExpiryTime': options.cachedSettingsExpiryTime,
+        'batchMinSize': options.batchMinSize,
+        'batchUploadTimeInterval': "${options.batchUploadTimeInterval}",
       };
 
-      await methodChannel.invokeMethod('init', parameters);
-      var flutterSdk = MethodChannelVwoFmeFlutterSdk();
-      // Set the integration callback handler if provided
-      if (options.integrationCallback != null) {
-        flutterSdk._setIntegrationCallbackHandler(options.integrationCallback!);
-      }
-      return flutterSdk;
+    var flutterSdk = MethodChannelVwoFmeFlutterSdk();
+    // Set the integration callback handler if provided
+    flutterSdk._setBridgeCallbackHandler(options);
+    flutterSdk._transports = transportsCopy;
 
-}
+    await methodChannel.invokeMethod('init', parameters);
+    return flutterSdk;
+  }
 
-  /// Sets the integration callback handler.
+  /// Prepares the loggers for the bridge by converting them to a list of maps.
   ///
-  /// [callback] The callback function to be invoked when an integration event occurs.
-  /// The callback function receives a map containing the event data.
-  void _setIntegrationCallbackHandler(Function(Map<String, dynamic>) callback) {
+  /// This method iterates through the transports in the logger configuration and
+  /// creates a new list of maps, where each map represents a transport.
+  ///
+  /// The original `transports` list in the logger configuration is modified in place.
+  /// Each `LogTransport` object is replaced with `true` in the original list.
+  ///
+  /// [options] The initialization options for the VWO SDK, which may contain
+  ///           logger configuration with a list of transports.
+  ///
+  /// Returns a list of maps representing the loggers. Each map contains a single
+  /// key-value pair, where the key is a string (the transport name) and the
+  /// value is a [LogTransport] object.
+  static List<Map<String, dynamic>> _prepareLoggersForBridge(
+      VWOInitOptions options) {
+    List<Map<String, dynamic>> transportsCopy = <Map<String, dynamic>>[];
+    if (options.logger?.containsKey("transports") == true) {
+      // Extract the transports list from the logger
+      var transports =
+          options.logger!["transports"] as List<Map<String, dynamic>>;
+
+      // Iterate through the transports list
+      for (var transportMap in transports) {
+        var map = <String, LogTransport>{};
+        transportMap.forEach((key, value) {
+          if (transportMap[key] != null && transportMap[key] is LogTransport) {
+            map[key] = value;
+            transportMap[key] = true;
+          } else if (transportMap[key] != null) {
+            transportMap[key] = true;
+          }
+        });
+        transportsCopy.add(map);
+      }
+    }
+    return transportsCopy;
+  }
+
+  /// Handles the `onIntegrationCallback` method call from the native side.
+  ///
+  /// This function extracts the properties from the call arguments and
+  /// calls the integration callback function if provided.
+  ///
+  /// [options] The initialization options for the VWO SDK.
+  /// [properties] The properties map received from the native side.
+  void _setBridgeCallbackHandler(VWOInitOptions options) {
+
     methodChannel.setMethodCallHandler((call) async {
+
+      final Map<String, dynamic> properties =
+          Map<String, dynamic>.from(call.arguments);
+
       if (call.method == "onIntegrationCallback") {
-        final Map<String, dynamic> properties = Map<String, dynamic>.from(call.arguments);
-        callback(properties);
+
+        options.integrationCallback?.call(properties);
+      } else if (call.method == "onLoggerCallback") {
+
+        _processLog(properties);
       }
     });
+  }
+
+  /// Processes a log message received from the native side.
+  ///
+  /// This method handles log messages received through the `onLoggerCallback`
+  /// method call from the native platform. It iterates through the registered
+  /// log transports (`_transports`) and forwards the log message to each of them.
+  ///
+  /// If `_transports` is null or empty, this method does nothing.
+  ///
+  /// [properties] A map containing the log message properties, including
+  ///              "level" (the log level) and "message" (the log message).
+  void _processLog(Map<String, dynamic> properties) {
+    if (_transports == null || _transports?.isEmpty == true) return;
+    // var transports = options.logger!["transports"] as List<Map<String, dynamic>>;
+    var transport = _transports!;
+    // Iterate through the transports list
+    for (var transportMap in transport) {
+      for (var element in transportMap.entries) {
+        var logTransport = element.value as LogTransport;
+        var level = properties["level"];
+        var message = properties["message"];
+        logTransport.log(level, message);
+      }
+    }
   }
 
   /// Gets the value of a feature flag.
@@ -154,27 +239,33 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
   /// Sets a user attribute.
   ///
-  /// [attributeKey] The key of the attribute.
-  /// [attributeValue] The value of the attribute.
+  /// [attributes] The map of the attributes.
   /// [context] The user context for the attribute.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   @override
-  Future<bool> setAttribute({
-    required String attributeKey,
-    required dynamic attributeValue,
-    required VWOContext vwoContext,
-  }) async {
+  Future<bool> setAttribute(
+      {required Map<String, dynamic> attributes,
+      required VWOContext userContext}) async {
     try {
-      final result = await methodChannel.invokeMethod<bool>(
-        'setAttribute',
-        {
-          'attributeKey': attributeKey,
-          'attributeValue': attributeValue,
-          'context': vwoContext.toMap(),
-        },
-      );
+      final Map<String, dynamic> arguments = {
+        'attributes': attributes,
+        'context': userContext.toMap(),
+      };
+      final result =
+          await methodChannel.invokeMethod<bool>('setAttribute', arguments);
       return result ?? false;
+    } on PlatformException catch (e) {
+      // Handle errors from the native side
+      throw Exception("Error: ${e.code}, ${e.message}");
+    }
+  }
+
+  @override
+  Future<bool> setSessionData(Map<String, dynamic> sessionData) async {
+    try {
+      return await methodChannel.invokeMethod('setSessionData', sessionData) ??
+          false;
     } on PlatformException catch (e) {
       // Handle errors from the native side
       throw Exception("Error: ${e.code}, ${e.message}");
