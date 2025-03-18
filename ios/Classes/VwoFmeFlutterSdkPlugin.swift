@@ -19,7 +19,7 @@ import UIKit
 import VWO_FME
 
 //Constants
-private let SDK_VERSION = "1.4.0"
+private let SDK_VERSION = "1.5.0"
 private let SDK_NAME = "vwo-fme-flutter-sdk"
 
 // Plugin constants
@@ -173,14 +173,9 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Extract ipAddress and userAgent from userContext
-        let ipAddress = userContext["ipAddress"] as? String ?? ""
-        let userAgent = userContext["userAgent"] as? String ?? ""
-        // Initialize VWOContext with id, customVariables, ipAddress, and userAgent
+        // Initialize VWOContext with id, customVariables
         let vwoContext = VWOContext(id: userContext["id"] as? String,
-                                    customVariables: userContext["customVariables"] as? [String: Any] ?? [:],
-                                    ipAddress: ipAddress,
-                                    userAgent: userAgent)
+                                    customVariables: userContext["customVariables"] as? [String: Any] ?? [:])
 
         // Call VWOFme.getFlag with the initialized VWOContext
         VWOFme.getFlag(featureKey: flagName, context: vwoContext) { flag in

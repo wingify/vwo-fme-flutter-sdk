@@ -37,9 +37,7 @@ VWO? vwoClient = await VWO.init(initOptions);
 // Define the user context with user ID and custom variables.
 final vwoContext = VWOContext(
   userId: userId,
-  customVariables: {'number': 12, 'key2': 'value2'},
-  ipAddress: "1.0.0.1",
-  userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (HTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  customVariables: {'number': 12, 'key2': 'value2'}
 );
 
 // Get the feature flag result.

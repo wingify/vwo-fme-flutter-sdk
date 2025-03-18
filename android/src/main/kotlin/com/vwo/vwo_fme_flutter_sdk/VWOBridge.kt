@@ -36,7 +36,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.MethodChannel
 import kotlin.text.toLongOrNull
 
-const val SDK_VERSION = "1.4.0"
+const val SDK_VERSION = "1.5.0"
 const val SDK_NAME = "vwo-fme-flutter-sdk"
 
 /**
@@ -205,8 +205,6 @@ class VWOBridge(private val context: Context) {
             // Create VWOContext from userContextMap
             val userContext = VWOContext().apply {
                 id = userContextMap["id"] as? String
-                userAgent = userContextMap["userAgent"] as? String ?: ""
-                ipAddress = userContextMap["ipAddress"] as? String ?: ""
                 customVariables.putAll(userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap())
                 variationTargetingVariables.putAll(userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap())
             }
@@ -216,7 +214,6 @@ class VWOBridge(private val context: Context) {
             if (gatewayServiceMap != null) {
                 val gatewayService = GatewayService().apply {
                     location = gatewayServiceMap["location"] as? Map<String, String>
-                    userAgent = gatewayServiceMap["userAgent"] as? Map<String, String>
                 }
                 userContext.vwo = gatewayService
             }
@@ -291,8 +288,6 @@ class VWOBridge(private val context: Context) {
             // Convert the incoming context map to a VWOContext object
             val context = VWOContext().apply {
                 id = contextMap["id"] as? String
-                userAgent = contextMap["userAgent"] as? String ?: ""
-                ipAddress = contextMap["ipAddress"] as? String ?: ""
                 customVariables = contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
                 variationTargetingVariables = contextMap["variationTargetingVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
             }
@@ -356,8 +351,6 @@ class VWOBridge(private val context: Context) {
             // Convert contextMap to VWOContext object
             val context = VWOContext().apply {
                 id = contextMap["id"] as? String
-                userAgent = contextMap["userAgent"] as? String ?: ""
-                ipAddress = contextMap["ipAddress"] as? String ?: ""
                 customVariables =
                     contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
                 variationTargetingVariables =
