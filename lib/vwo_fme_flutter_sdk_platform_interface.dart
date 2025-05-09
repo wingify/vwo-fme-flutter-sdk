@@ -15,8 +15,8 @@
  */
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 
+import 'vwo/models/vwo_user_context.dart';
 import 'vwo_fme_flutter_sdk_method_channel.dart';
 
 abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
@@ -42,13 +42,13 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
 
   /// Gets the value of a feature flag.
   ///
-  /// [flagName] The name of the feature flag.
-  /// [vwoContext] The user context for evaluating the flag.
+  /// [featureKey] The name of the feature flag.
+  /// [context] The user context for evaluating the flag.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   Future<GetFlag?> getFlag({
-    required String flagName,
-    required VWOContext vwoContext,
+    required String featureKey,
+    required VWOUserContext userContext,
   }) {
     throw UnimplementedError('getFlag() has not been implemented.');
   }
@@ -62,7 +62,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   Future<Map<String, bool>> trackEvent({
     required String eventName,
-    required VWOContext vwoContext,
+    required VWOUserContext userContext,
     Map<String, dynamic>? eventProperties,
   }) {
     throw UnimplementedError('trackEvent() has not been implemented.');
@@ -76,7 +76,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   Future<bool> setAttribute(
       {required Map<String, dynamic> attributes,
-      required VWOContext userContext}) {
+      required VWOUserContext userContext}) {
     throw UnimplementedError('setAttribute() has not been implemented.');
   }
 

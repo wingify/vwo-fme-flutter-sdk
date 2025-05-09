@@ -1,24 +1,24 @@
-class VWOContext {
-  final String userId;
+class VWOUserContext {
+  final String id;
   final Map<String, dynamic>? customVariables;
 
-  VWOContext({
-    required this.userId, // Mandatory parameter
+  VWOUserContext({
+    required this.id, // Mandatory parameter
     this.customVariables,
   });
 
-  /// Converts the `UserContext` object into a Map.
+  /// Converts the `VWOUserContext` object into a Map.
   Map<String, dynamic> toMap() {
     return {
-      'id': userId,
+      'id': id,
       'customVariables': customVariables,
     };
   }
 
   @override
   String toString() {
-    return 'UserContext('
-        'userId: $userId, '
+    return 'VWOUserContext('
+        'userId: $id, '
         'customVariables: $customVariables)';
   }
 }

@@ -15,7 +15,7 @@
 const int accountId = -1;
 const String sdkKey = "";
 const String userId='user3';
-const flagName = "flag-name";
+const featureKey = "feature-key";
 const variableName = "color";
 const eventName = "productAddedToCart";
 const attributeName = "attribute-name";

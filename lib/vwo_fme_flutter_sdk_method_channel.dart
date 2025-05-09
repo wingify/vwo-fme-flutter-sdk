@@ -16,11 +16,13 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
+import 'package:vwo_fme_flutter_sdk/utils/usage_stats.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
+import 'package:vwo_fme_flutter_sdk/utils/constants.dart';
 
 import 'logger/log_transport.dart';
+import 'vwo/models/vwo_user_context.dart';
 import 'vwo_fme_flutter_sdk_platform_interface.dart';
 
 /// An implementation of [VwoFmeFlutterSdkPlatform] that uses method channels.
@@ -61,16 +63,22 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     List<Map<String, dynamic>> transportsCopy =
         _prepareLoggersForBridge(options);
 
-      final parameters = {
-        'sdkKey': options.sdkKey,
-        'accountId': options.accountId,
-        'logger': options.logger,
-        'gatewayService': options.gatewayService,
-        'pollInterval': options.pollInterval,
-        'cachedSettingsExpiryTime': options.cachedSettingsExpiryTime,
-        'batchMinSize': options.batchMinSize,
-        'batchUploadTimeInterval': "${options.batchUploadTimeInterval}",
-      };
+    Map<String, dynamic> stats = await UsageStats(options).getStats();
+
+    final parameters = {
+      'sdkKey': options.sdkKey,
+      'accountId': options.accountId,
+      'logger': options.logger,
+      'gatewayService': options.gatewayService,
+      'pollInterval': options.pollInterval,
+      'cachedSettingsExpiryTime': options.cachedSettingsExpiryTime,
+      'batchMinSize': options.batchMinSize,
+      'batchUploadTimeInterval': "${options.batchUploadTimeInterval}",
+      '_vwo_meta': stats,
+      'sdkVersion': sdkVersion,
+      'isUsageStatsDisabled': options.isUsageStatsDisabled,
+      'hasIntegrations': options.integrations != null
+    };
 
     var flutterSdk = MethodChannelVwoFmeFlutterSdk();
     // Set the integration callback handler if provided
@@ -136,7 +144,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
       if (call.method == "onIntegrationCallback") {
 
-        options.integrationCallback?.call(properties);
+        options.integrations?.call(properties);
       } else if (call.method == "onLoggerCallback") {
 
         _processLog(properties);
@@ -171,19 +179,19 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
   /// Gets the value of a feature flag.
   ///
-  /// [flagName] The name of the feature flag.
-  /// [vwoContext] The user context for evaluating the flag.
+  /// [featureKey] The name of the feature flag.
+  /// [userContext] The user context for evaluating the flag.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   @override
   Future<GetFlag> getFlag({
-    required String flagName,
-    required VWOContext vwoContext,
+    required String featureKey,
+    required VWOUserContext userContext,
   }) async {
     try {
       final dynamic result = await methodChannel.invokeMethod('getFlag', {
-        'flagName': flagName,
-        'userContext': vwoContext.toMap(),
+        'flagName': featureKey,
+        'userContext': userContext.toMap(),
       });
 
       // Explicitly cast the result to Map<String, dynamic> if possible
@@ -192,12 +200,13 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
         final Map<String, dynamic> resultMap = {};
         result.forEach((key, value) {
           if (key is String) {
-            resultMap[key] = value;  // Ensure value is dynamic
+            resultMap[key] = value; // Ensure value is dynamic
           }
         });
         return GetFlag.fromMap(resultMap);
       } else {
-        throw Exception("Expected result type Map<String, dynamic> but got ${result.runtimeType}");
+        throw Exception(
+            "Expected result type Map<String, dynamic> but got ${result.runtimeType}");
       }
     } catch (e) {
       return Future.error(e);
@@ -207,14 +216,14 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// Tracks an event.
   ///
   /// [eventName] The name of the event.
-  /// [context] The user context for the event.
+  /// [userContext] The user context for the event.
   /// [eventProperties] Optional properties associated with the event.
   ///
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   @override
   Future<Map<String, bool>> trackEvent({
     required String eventName,
-    required VWOContext vwoContext,
+    required VWOUserContext userContext,
     Map<String, dynamic>? eventProperties,
   }) async {
     try {
@@ -222,7 +231,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
         'trackEvent',
         {
           'eventName': eventName,
-          'context': vwoContext.toMap(),
+          'context': userContext.toMap(),
           'eventProperties': eventProperties,
         },
       );
@@ -240,13 +249,13 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// Sets a user attribute.
   ///
   /// [attributes] The map of the attributes.
-  /// [context] The user context for the attribute.
+  /// [userContext] The user context for the attribute.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   @override
   Future<bool> setAttribute(
       {required Map<String, dynamic> attributes,
-      required VWOContext userContext}) async {
+      required VWOUserContext userContext}) async {
     try {
       final Map<String, dynamic> arguments = {
         'attributes': attributes,

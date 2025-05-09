@@ -19,7 +19,6 @@ import UIKit
 import VWO_FME
 
 //Constants
-private let SDK_VERSION = "1.5.0"
 private let SDK_NAME = "vwo-fme-flutter-sdk"
 
 // Plugin constants
@@ -101,6 +100,10 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let pollInterval: Int64? = args["pollInterval"] as? Int64 ?? nil
         let cachedSettingsExpiryTime: Int64? = args["cachedSettingsExpiryTime"] as? Int64 ?? nil
         let batchMinSize = args["batchMinSize"] as? Int ?? nil
+        let sdkVersion = args["sdkVersion"] as? String ?? ""
+        let isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Bool ?? false
+        let vwoMeta = args["_vwo_meta"] as? [String: Any] ?? [:]
+        let hasIntegrations = args["hasIntegrations"] as? Bool ?? false
 
         var batchUploadTimeInterval: Int64 = -1
         if let batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String {
@@ -124,15 +127,17 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                         accountId: accountId,
                                         logLevel: logLevel,
                                         logPrefix: logPrefix,
-                                        integrations: self,
+                                        integrations: hasIntegrations ? self : nil,
                                         gatewayService: gatewayService ?? [:],
                                         cachedSettingsExpiryTime: cachedSettingsExpiryTime,
                                         pollInterval: pollInterval,
                                         batchMinSize: batchMinSize == -1 ? nil : batchMinSize,
                                         batchUploadTimeInterval: batchUploadTimeInterval == -1 ? nil : batchUploadTimeInterval,
-                                        sdkName: SDK_VERSION,
-                                        sdkVersion: SDK_NAME,
-                                        logTransport: self.logTransport)
+                                        sdkName: SDK_NAME,
+                                        sdkVersion: sdkVersion,
+                                        logTransport: self.logTransport,
+                                        isUsageStatsDisabled: isUsageStatsDisabled,
+                                        vwoMeta: vwoMeta)
 
         VWOFme.initialize(options: vwoOptions) { initResult in
             switch initResult {
@@ -168,17 +173,17 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
     private func getFlag(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
               let flagName = args["flagName"] as? String,
-              let userContext = args["userContext"] as? [String: Any] else {
+              let usrContext = args["userContext"] as? [String: Any] else {
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "flagName and userContext are required", details: nil))
             return
         }
 
-        // Initialize VWOContext with id, customVariables
-        let vwoContext = VWOContext(id: userContext["id"] as? String,
-                                    customVariables: userContext["customVariables"] as? [String: Any] ?? [:])
+        // Initialize VWOUserContext with id, customVariables
+        let userContext = VWOUserContext(id: usrContext["id"] as? String,
+                                    customVariables: usrContext["customVariables"] as? [String: Any] ?? [:])
 
-        // Call VWOFme.getFlag with the initialized VWOContext
-        VWOFme.getFlag(featureKey: flagName, context: vwoContext) { flag in
+        // Call VWOFme.getFlag with the initialized VWOUserContext
+        VWOFme.getFlag(featureKey: flagName, context: userContext) { flag in
             let flagResult: [String: Any] = [
                 "isEnabled": flag.isEnabled(),
                 "variables": flag.getVariables(),
@@ -202,14 +207,14 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
 
         let eventProperties = args["eventProperties"] as? [String: Any]
 
-        let vwoContext = VWOContext(id: context["id"] as? String,
+        let userContext = VWOUserContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
 
         // Call the VWO SDK's trackEvent method
         if let properties = eventProperties {
-            VWOFme.trackEvent(eventName: eventName, context: vwoContext, eventProperties: properties)
+            VWOFme.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
         } else {
-            VWOFme.trackEvent(eventName: eventName, context: vwoContext)
+            VWOFme.trackEvent(eventName: eventName, context: userContext)
         }
         let response: [String: Bool] = ["success": true]
         result(response)
@@ -228,9 +233,9 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        let vwoContext = VWOContext(id: context["id"] as? String,
+        let userContext = VWOUserContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        VWOFme.setAttribute(attributes: attributes, context: vwoContext)
+        VWOFme.setAttribute(attributes: attributes, context: userContext)
         result(true)
     }
 

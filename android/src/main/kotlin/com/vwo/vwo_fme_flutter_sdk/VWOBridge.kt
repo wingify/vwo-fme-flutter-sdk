@@ -25,7 +25,7 @@ import com.vwo.models.user.VWOInitOptions
 import com.vwo.interfaces.IVwoInitCallback
 import com.vwo.interfaces.IVwoListener
 import com.vwo.models.user.GetFlag
-import com.vwo.models.user.VWOContext
+import com.vwo.models.user.VWOUserContext
 import com.vwo.models.user.GatewayService
 import com.vwo.interfaces.logger.LogTransport
 import com.vwo.packages.logger.enums.LogLevelEnum
@@ -36,7 +36,6 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.MethodChannel
 import kotlin.text.toLongOrNull
 
-const val SDK_VERSION = "1.5.0"
 const val SDK_NAME = "vwo-fme-flutter-sdk"
 
 /**
@@ -80,6 +79,10 @@ class VWOBridge(private val context: Context) {
         val batchMinSize = (args["batchMinSize"] as? Int) ?: -1
         val batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String
         val batchUploadTimeInterval = batchUploadTimeIntervalString?.toLongOrNull() ?: -1L
+        val sdkVersion = args["sdkVersion"] as? String ?: ""
+        val isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Boolean ?: false
+        val vwoMeta = args["_vwo_meta"] as? Map<String, Any> ?: mapOf()
+        val hasIntegrations = args["hasIntegrations"] as? Boolean ?: false
 
         val vwoInitOptions = VWOInitOptions().apply {
             this.sdkKey = sdkKey
@@ -114,15 +117,21 @@ class VWOBridge(private val context: Context) {
                 this.batchUploadTimeInterval = batchUploadTimeInterval
             }
             this.context = this@VWOBridge.context.applicationContext
-            this.sdkVersion = SDK_VERSION
+            this.sdkVersion = sdkVersion
             this.sdkName = SDK_NAME
+            this.isUsageStatsDisabled = isUsageStatsDisabled
+            this._vwo_meta = vwoMeta
         }
-        vwoInitOptions.integrations = object : IntegrationCallback {
-            override fun execute(properties: Map<String, Any>) {
-                Handler(Looper.getMainLooper()).post {
-                    // Filter out objects and keep only basic data types
-                    val filteredProperties = filterBasicDataTypes(properties)
-                    channel.invokeMethod("onIntegrationCallback", filteredProperties)
+
+        // Only set integrations if provided by the client
+        if (hasIntegrations) {
+            vwoInitOptions.integrations = object : IntegrationCallback {
+                override fun execute(properties: Map<String, Any>) {
+                    Handler(Looper.getMainLooper()).post {
+                        // Filter out objects and keep only basic data types
+                        val filteredProperties = filterBasicDataTypes(properties)
+                        channel.invokeMethod("onIntegrationCallback", filteredProperties)
+                    }
                 }
             }
         }
@@ -202,8 +211,8 @@ class VWOBridge(private val context: Context) {
                 return
             }
 
-            // Create VWOContext from userContextMap
-            val userContext = VWOContext().apply {
+            // Create VWOUserContext from userContextMap
+            val userContext = VWOUserContext().apply {
                 id = userContextMap["id"] as? String
                 customVariables.putAll(userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap())
                 variationTargetingVariables.putAll(userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap())
@@ -226,7 +235,7 @@ class VWOBridge(private val context: Context) {
         }
     }
 
-    private fun handleGetFlag(flagName: String, userContext: VWOContext, result: Result) {
+    private fun handleGetFlag(flagName: String, userContext: VWOUserContext, result: Result) {
         try {
             vwo?.getFlag(flagName, userContext, object : IVwoListener {
                 override fun onSuccess(data: Any) {
@@ -285,8 +294,8 @@ class VWOBridge(private val context: Context) {
         result: Result
     ) {
         try {
-            // Convert the incoming context map to a VWOContext object
-            val context = VWOContext().apply {
+            // Convert the incoming context map to a VWOUserContext object
+            val context = VWOUserContext().apply {
                 id = contextMap["id"] as? String
                 customVariables = contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
                 variationTargetingVariables = contextMap["variationTargetingVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
@@ -348,8 +357,8 @@ class VWOBridge(private val context: Context) {
         result: Result
     ) {
         try {
-            // Convert contextMap to VWOContext object
-            val context = VWOContext().apply {
+            // Convert contextMap to VWOUserContext object
+            val context = VWOUserContext().apply {
                 id = contextMap["id"] as? String
                 customVariables =
                     contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()

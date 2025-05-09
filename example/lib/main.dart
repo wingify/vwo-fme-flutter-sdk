@@ -15,9 +15,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
 import 'package:vwo_fme_flutter_sdk/vwo.dart';
+import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_user_context.dart';
 import 'package:vwo_fme_flutter_sdk_example/constants/constants.dart';
 import 'package:vwo_fme_flutter_sdk_example/logger/dart_logger.dart';
 
@@ -34,10 +34,10 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
-  VWO? _vwo;
+  VWO? _vwoClient;
 
-  final vwoContext = VWOContext(
-    userId: userId,
+  final userContext = VWOUserContext(
+    id: userId,
     customVariables: {'number': 12, 'key2': 'value2'}
   );
 
@@ -65,14 +65,20 @@ class _MyAppState extends State<MyApp> {
         //pollInterval: 10000,
         //batchMinSize: 4,
         //batchUploadTimeInterval: 3 * 60 * 1000,
-        integrationCallback: (Map<String, dynamic> properties) {
+        //cachedSettingsExpiryTime: 10000,
+        //isUsageStatsDisabled: true,
+        integrations: (Map<String, dynamic> properties) {
           print('VWO: Integration callback received: $properties');
         });
 
-    _vwo = await VWO.init(initOptions);
+    // This is intended for VWO's internal applications only.
+    // Clients should not use this in their implementations.
+    initOptions.vwo_meta["ea"] = 1;
+
+    _vwoClient = await VWO.init(initOptions);
 
     var status = "VWO: Initialization successful.";
-    if (_vwo == null) {
+    if (_vwoClient == null) {
       status = "VWO: Initialization failed.";
     }
     // If the widget was removed from the tree while the asynchronous platform
@@ -87,18 +93,18 @@ class _MyAppState extends State<MyApp> {
 
   /// This method is used to get the flag value for the given feature key.
   void _getFlag() async {
-      final GetFlag? result = await _vwo?.getFlag(
-        flagName: flagName,
-        vwoContext: vwoContext,
+      final GetFlag? featureFlag = await _vwoClient?.getFlag(
+        featureKey: featureKey,
+        context: userContext,
       );
-      if (result != null && result.isEnabled()) {
+      if (featureFlag != null && featureFlag.isEnabled()) {
         print('VWO: Feature flag retrieved successfully and is enabled');
       } else {
         print('VWO: Failed to retrieve or enable feature flag');
       }
 
-      dynamic color = result?.getVariable(variableName, 'unknownColor');
-      dynamic variables = result?.getVariables();
+      dynamic color = featureFlag?.getVariable(variableName, 'unknownColor');
+      dynamic variables = featureFlag?.getVariables();
 
       print("VWO: Color = $color variable = $variables");
   }
@@ -111,15 +117,15 @@ class _MyAppState extends State<MyApp> {
         "price": 21,
         "productId":1,
       };
-      final trackingResult = await _vwo?.trackEvent(
+      final trackingResult = await _vwoClient?.trackEvent(
           eventName: eventName,
-          vwoContext: vwoContext,
+          context: userContext,
           //eventProperties: properties
       );
       print("VWO: Tracking Result: $trackingResult");
   }
 
-  /// Sets an attribute for a user in the vwoContext provided.
+  /// Sets an attribute for a user in the userContext provided.
   void _setAttribute() async {
 
     var attributes = {
@@ -127,9 +133,9 @@ class _MyAppState extends State<MyApp> {
       'price': 99,
       "isEnterpriseCustomer": false
     };
-    final success = await _vwo?.setAttribute(
+    await _vwoClient?.setAttribute(
       attributes: attributes,
-      vwoContext: vwoContext,
+      context: userContext,
     );
   }
 

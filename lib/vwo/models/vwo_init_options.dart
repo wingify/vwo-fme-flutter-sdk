@@ -19,13 +19,19 @@ class VWOInitOptions {
   final Map<String, String>? gatewayService;
   final int? pollInterval;
   final int? cachedSettingsExpiryTime;
-  final Function(Map<String, dynamic>)? integrationCallback;
+  final Function(Map<String, dynamic>)? integrations;
 
   /// Optional: Minimum size of Batch to upload
   final int batchMinSize;
 
   /// Optional: Batch upload time interval in milliseconds. Please specify at least few minutes
   final int batchUploadTimeInterval;
+
+  /// Optional: Usage stats should always be collected, don't collect if [isUsageStatsDisabled] flag is true
+  bool isUsageStatsDisabled = false;
+
+  /// Internal meta data for VWO use.
+  Map<String, dynamic> vwo_meta = {};
 
   VWOInitOptions({
     required this.sdkKey,
@@ -34,9 +40,10 @@ class VWOInitOptions {
     this.gatewayService,
     this.pollInterval,
     this.cachedSettingsExpiryTime,
-    this.integrationCallback,
+    this.integrations,
     this.batchMinSize = -1,
     this.batchUploadTimeInterval = -1,
+    this.isUsageStatsDisabled = false
   });
 
   @override
@@ -48,8 +55,10 @@ class VWOInitOptions {
         'gatewayService: $gatewayService, '
         'pollInterval: $pollInterval, '
         'cachedSettingsExpiryTime: $cachedSettingsExpiryTime, '
-        'integrationCallback: ${integrationCallback != null ? 'Provided' : 'Not Provided'}, '
+        'integrationCallback: ${integrations != null ? 'Provided' : 'Not Provided'}, '
         'batchMinSize: $batchMinSize, '
-        'batchUploadTimeInterval: $batchUploadTimeInterval)';
+        'batchUploadTimeInterval: $batchUploadTimeInterval, '
+        'isUsageStatsDisabled: $isUsageStatsDisabled, '
+        'vwo_meta: $vwo_meta)';
   }
 }
