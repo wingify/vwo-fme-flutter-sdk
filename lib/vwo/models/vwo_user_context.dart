@@ -1,10 +1,12 @@
 class VWOUserContext {
-  final String id;
+  final String? id;
   final Map<String, dynamic>? customVariables;
+  final bool shouldUseDeviceIdAsUserId;
 
   VWOUserContext({
-    required this.id, // Mandatory parameter
+    this.id, // Optional parameter since it is nullable
     this.customVariables,
+    this.shouldUseDeviceIdAsUserId = false, // Default to false
   });
 
   /// Converts the `VWOUserContext` object into a Map.
@@ -12,6 +14,7 @@ class VWOUserContext {
     return {
       'id': id,
       'customVariables': customVariables,
+      'shouldUseDeviceIdAsUserId': shouldUseDeviceIdAsUserId,
     };
   }
 
@@ -19,6 +22,7 @@ class VWOUserContext {
   String toString() {
     return 'VWOUserContext('
         'userId: $id, '
-        'customVariables: $customVariables)';
+        'customVariables: $customVariables, '
+        'shouldUseDeviceIdAsUserId: $shouldUseDeviceIdAsUserId)';
   }
 }

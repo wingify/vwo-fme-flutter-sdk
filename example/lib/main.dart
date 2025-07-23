@@ -38,7 +38,9 @@ class _MyAppState extends State<MyApp> {
 
   final userContext = VWOUserContext(
     id: userId,
-    customVariables: {'number': 12, 'key2': 'value2'}
+    customVariables: {'number': 12, 'key2': 'value2'},
+    shouldUseDeviceIdAsUserId:
+        false, // Set to true to use device ID as user ID when userId is not provided
   );
 
   @override
@@ -93,41 +95,40 @@ class _MyAppState extends State<MyApp> {
 
   /// This method is used to get the flag value for the given feature key.
   void _getFlag() async {
-      final GetFlag? featureFlag = await _vwoClient?.getFlag(
-        featureKey: featureKey,
-        context: userContext,
-      );
-      if (featureFlag != null && featureFlag.isEnabled()) {
-        print('VWO: Feature flag retrieved successfully and is enabled');
-      } else {
-        print('VWO: Failed to retrieve or enable feature flag');
-      }
+    final GetFlag? featureFlag = await _vwoClient?.getFlag(
+      featureKey: featureKey,
+      context: userContext,
+    );
+    if (featureFlag != null && featureFlag.isEnabled()) {
+      print('VWO: Feature flag retrieved successfully and is enabled');
+    } else {
+      print('VWO: Failed to retrieve or enable feature flag');
+    }
 
-      dynamic color = featureFlag?.getVariable(variableName, 'unknownColor');
-      dynamic variables = featureFlag?.getVariables();
+    dynamic color = featureFlag?.getVariable(variableName, 'unknownColor');
+    dynamic variables = featureFlag?.getVariables();
 
-      print("VWO: Color = $color variable = $variables");
+    print("VWO: Color = $color variable = $variables");
   }
 
   /// Track method to track the event.
   void _trackEvent() async {
-      var properties = {
-        "category": "electronics",
-        "isWishlisted":false,
-        "price": 21,
-        "productId":1,
-      };
-      final trackingResult = await _vwoClient?.trackEvent(
-          eventName: eventName,
-          context: userContext,
-          //eventProperties: properties
-      );
-      print("VWO: Tracking Result: $trackingResult");
+    var properties = {
+      "category": "electronics",
+      "isWishlisted": false,
+      "price": 21,
+      "productId": 1,
+    };
+    final trackingResult = await _vwoClient?.trackEvent(
+      eventName: eventName,
+      context: userContext,
+      //eventProperties: properties
+    );
+    print("VWO: Tracking Result: $trackingResult");
   }
 
   /// Sets an attribute for a user in the userContext provided.
   void _setAttribute() async {
-
     var attributes = {
       'userType': 'free',
       'price': 99,

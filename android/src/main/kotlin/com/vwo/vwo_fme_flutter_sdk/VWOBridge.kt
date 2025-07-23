@@ -216,6 +216,7 @@ class VWOBridge(private val context: Context) {
                 id = userContextMap["id"] as? String
                 customVariables.putAll(userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap())
                 variationTargetingVariables.putAll(userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap())
+                shouldUseDeviceIdAsUserId = userContextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Handle gatewayService if present
@@ -299,6 +300,7 @@ class VWOBridge(private val context: Context) {
                 id = contextMap["id"] as? String
                 customVariables = contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
                 variationTargetingVariables = contextMap["variationTargetingVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
+                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Call the appropriate `trackEvent` method based on the presence of eventProperties
@@ -365,6 +367,7 @@ class VWOBridge(private val context: Context) {
                 variationTargetingVariables =
                     contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
                         ?: mutableMapOf()
+                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Call the setAttribute method

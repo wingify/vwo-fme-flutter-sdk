@@ -66,7 +66,8 @@ final vwoClient = await VWO.init(vwoInitOptions);
 // Create VWOUserContext object
 final context = VWOUserContext(
     id: "unique_user_id",
-    customVariables: {"key1": 21, "key2":"value"}
+    customVariables: {"key1": 21, "key2":"value"},
+    shouldUseDeviceIdAsUserId: false, // Set to true to use device ID as user ID when userId is not provided
 );
 
 // Get the GetFlag object for the feature key and context
@@ -125,8 +126,9 @@ The following table explains all the parameters in the `context` object:
 
 | **Parameter**     | **Description**                                                            | **Required** | **Type** | **Example**                       |
 | ----------------- | -------------------------------------------------------------------------- | ------------ | -------- | --------------------------------- |
-| `id`              | Unique identifier for the user.                                            | Yes          | String   | `'unique_user_id'`                |
+| `id`              | Unique identifier for the user. Can be null if shouldUseDeviceIdAsUserId is true. | No           | String?  | `'unique_user_id'`                |
 | `customVariables` | Custom attributes for targeting.                                           | No           | Object   | `{ age: 25, location: 'US' }`     |
+| `shouldUseDeviceIdAsUserId` | When set to true, uses device ID as user ID when userId is not provided. Defaults to false. | No | Boolean | `true` |
 
 #### Example
 
@@ -136,7 +138,17 @@ final userContext = VWOUserContext(
     customVariables: {
         "age": 25,
         "location": "US"
-    }
+    },
+    shouldUseDeviceIdAsUserId: false, // Set to true to use device ID as user ID when userId is not provided
+);
+
+// Example with null id and device ID as user ID
+final userContextWithDeviceId = VWOUserContext(
+    customVariables: {
+        "age": 25,
+        "location": "US"
+    },
+    shouldUseDeviceIdAsUserId: true, // Will use device ID as user ID
 );
 ```
 
