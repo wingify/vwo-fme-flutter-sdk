@@ -23,4 +23,5 @@ object VWOConstants {
     const val ANDROID_TRACK_EVENT = "trackEvent"
     const val ANDROID_SET_ATTRIBUTE = "setAttribute"
     const val ANDROID_SET_SESSION = "setSessionData"
+    const val ANDROID_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 }

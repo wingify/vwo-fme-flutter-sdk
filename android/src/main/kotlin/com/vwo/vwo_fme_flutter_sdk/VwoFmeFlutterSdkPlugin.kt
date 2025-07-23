@@ -64,6 +64,9 @@ class VwoFmeFlutterSdkPlugin : FlutterPlugin, MethodCallHandler {
             VWOConstants.ANDROID_SET_SESSION -> {
                 bridge?.setSessionData(call, result)
             }
+            VWOConstants.ANDROID_SEND_SDK_INIT_EVENT -> {
+                bridge?.sendSdkInitEvent(call, result)
+            }
             else -> {
                 result.notImplemented()
             }

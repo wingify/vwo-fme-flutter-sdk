@@ -51,6 +51,9 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   static Future<MethodChannelVwoFmeFlutterSdk?> init(
       VWOInitOptions options) async {
 
+    // Record the start time for measuring initialization duration
+    final initStartTime = DateTime.now().millisecondsSinceEpoch;
+
     // Validate required parameters
     if (options.sdkKey.isEmpty) {
       return Future.error(
@@ -86,6 +89,17 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     flutterSdk._transports = transportsCopy;
 
     await methodChannel.invokeMethod('init', parameters);
+
+    // Calculate initialization time and send to native SDK
+    final initEndTime = DateTime.now().millisecondsSinceEpoch;
+    final sdkInitTime = initEndTime - initStartTime;
+
+    // Send SDK initialization event with timing information
+    try {
+      await flutterSdk.sendSdkInitEvent(sdkInitTime);
+    } catch (e) {
+    }
+
     return flutterSdk;
   }
 
@@ -275,6 +289,27 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     try {
       return await methodChannel.invokeMethod('setSessionData', sessionData) ??
           false;
+    } on PlatformException catch (e) {
+      // Handle errors from the native side
+      throw Exception("Error: ${e.code}, ${e.message}");
+    }
+  }
+
+  /// Sends SDK initialization event with timing information.
+  ///
+  /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
+  ///
+  /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
+  @override
+  Future<bool> sendSdkInitEvent(int sdkInitTime) async {
+    try {
+      final result = await methodChannel.invokeMethod<bool>(
+        'sendSdkInitEvent',
+        {
+          'sdkInitTime': sdkInitTime.toString()
+        }, // Send as String for proper type conversion
+      );
+      return result ?? false;
     } on PlatformException catch (e) {
       // Handle errors from the native side
       throw Exception("Error: ${e.code}, ${e.message}");
