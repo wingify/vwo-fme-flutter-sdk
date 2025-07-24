@@ -2,7 +2,7 @@ name: vwo_fme_flutter_sdk
 description: FME is a server-side solution where you integrate VWO's SDK in your server codebase and can run feature tests, rollouts, personalization and experimentation campaigns.
 #Update version in constants.dart as well.
 #1.0.0: This is the version name (Major.Minor.Patch).
-version: 1.6.0
+version: 1.6.3
 homepage: https://vwo.com
 publish_to: none
 
