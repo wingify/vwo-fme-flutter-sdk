@@ -14,4 +14,4 @@
  *  limitations under the License.
  *
  */
-const sdkVersion = "1.6.4";
+const sdkVersion = "1.7.0";

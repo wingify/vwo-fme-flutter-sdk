@@ -67,7 +67,7 @@ final vwoClient = await VWO.init(vwoInitOptions);
 final context = VWOUserContext(
     id: "unique_user_id",
     customVariables: {"key1": 21, "key2":"value"},
-    shouldUseDeviceIdAsUserId: false, // Set to true to use device ID as user ID when userId is not provided
+    shouldUseDeviceIdAsUserId: true, // Set to true to use device ID as user ID when userId is not provided, this is false by default and need not be passed if not required
 );
 
 // Get the GetFlag object for the feature key and context
@@ -148,7 +148,7 @@ final userContextWithDeviceId = VWOUserContext(
         "age": 25,
         "location": "US"
     },
-    shouldUseDeviceIdAsUserId: true, // Will use device ID as user ID
+    shouldUseDeviceIdAsUserId: true, // Set to true to use device ID as user ID when userId is not provided, this is false by default and need not be passed if not required
 );
 ```
 

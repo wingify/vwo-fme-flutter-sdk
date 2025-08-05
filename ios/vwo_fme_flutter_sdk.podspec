@@ -15,7 +15,7 @@ FME is a server-side solution where you integrate VWO's SDK in your server codeb
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'VWO-FME','1.8.3'
+  s.dependency 'VWO-FME','1.9.0'
   s.platform = :ios, '12.0'
 
   # Flutter.framework does not contain a i386 slice.
