@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ```dart
 final userContext = VWOUserContext(
-    id: "", // Empty ID to trigger device ID fallback 
     shouldUseDeviceIdAsUserId: true // Set to true to use device ID as user ID when userId is not provided, this is false by default and need not be passed if not required
 );
 ```

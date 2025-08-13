@@ -65,7 +65,6 @@ final vwoClient = await VWO.init(vwoInitOptions);
 
 // Create VWOUserContext object
 final context = VWOUserContext(
-    id: "unique_user_id",
     customVariables: {"key1": 21, "key2":"value"},
     shouldUseDeviceIdAsUserId: true, // Set to true to use device ID as user ID when userId is not provided, this is false by default and need not be passed if not required
 );
