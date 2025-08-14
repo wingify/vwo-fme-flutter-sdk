@@ -432,4 +432,34 @@ class VWOBridge(private val context: Context) {
             result.error("INVALID_ARGUMENT", "Session data is null", null)
         }
     }
+
+    /**
+     * Function to send SDK initialization event with timing information.
+     */
+    fun sendSdkInitEvent(call: MethodCall, result: Result) {
+        try {
+            val sdkInitTimeStr = call.argument<String>("sdkInitTime")
+            
+            if (sdkInitTimeStr == null) {
+                result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
+                return
+            }
+
+            val sdkInitTime = sdkInitTimeStr.toLongOrNull()
+            if (sdkInitTime == null) {
+                result.error("INVALID_ARGUMENTS", "sdkInitTime must be a valid number", null)
+                return
+            }
+
+            // Call the native VWO SDK's sendSdkInitEvent method
+            vwo?.sendSdkInitEvent(sdkInitTime)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error(
+                "SEND_SDK_INIT_EVENT_ERROR",
+                "Error while sending SDK init event: ${e.message}",
+                e.stackTraceToString()
+            )
+        }
+    }
 }

@@ -27,6 +27,7 @@ private let IOS_GET_FLAG = "getFlag" // Use IOS_ prefix for iOS-specific constan
 private let IOS_TRACK_EVENT = "trackEvent" // Use IOS_ prefix for iOS-specific constants
 private let IOS_SET_ATTRIBUTE = "setAttribute"
 private let IOS_SET_SESSION = "setSessionData"
+private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 
 /// The VWO FME Flutter SDK plugin for iOS.
 ///
@@ -76,6 +77,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             setAttribute(call, result: result)
         case IOS_SET_SESSION:
             setSessionData(call, result: result)
+        case IOS_SEND_SDK_INIT_EVENT:
+            sendSdkInitEvent(call, result: result)
 
         default:
             result(FlutterMethodNotImplemented)
@@ -253,5 +256,23 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             message: "Session data is null",
             details: nil))
         }
+    }
+
+    /// Sends SDK initialization event with timing information.
+    ///
+    /// - Parameters:
+    /// - call: The method call.
+    /// - result: The result callback.
+    private func sendSdkInitEvent(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let sdkInitTimeStr = args["sdkInitTime"] as? String,
+              let sdkInitTime = Int64(sdkInitTimeStr) else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "sdkInitTime is required and must be a valid number", details: nil))
+            return
+        }
+
+        // Call the native VWO SDK's sendSdkInitEvent method
+        VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        result(true)
     }
 }
