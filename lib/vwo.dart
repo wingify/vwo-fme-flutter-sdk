@@ -137,6 +137,26 @@ class VWO {
     }
   }
 
+  Future<bool>? setAlias(
+    VWOUserContext context,
+    String aliasId,
+  ) async {
+    print(
+        "setAlias called with | aliasId: ${aliasId} and context: ${context.toMap()}");
+
+    try {
+      final plugin = _fmePlugin;
+      if (plugin == null) return false;
+
+      await plugin?.setAlias(context, aliasId);
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+    return false;
+  }
+
   static void logMessage(String message) {
     // Only prints in debug
     if (kDebugMode) {

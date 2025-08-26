@@ -435,4 +435,35 @@ class VWOBridge(private val context: Context) {
             result.error("INVALID_ARGUMENT", "Session data is null", null)
         }
     }
+
+    fun setAlias(call: MethodCall, result: Result) {
+
+
+        if (vwo == null) {
+
+            val message = "SDK is not initialized, please try again later."
+            result.error("SET_ALIAS_ERROR", message, null)
+            Log.e("VWO", message)
+            return
+        }
+
+        val contextMap = call.argument<Map<String, Any>>("context")
+        val aliasId = (call.argument<String>("aliasId") as? String)
+
+        Log.i("VWO", "Got some data across the method channel | $aliasId -> contextMap: $contextMap")
+
+        val userContext = VWOUserContext().apply {
+            id = (contextMap?.get("id") as? String)
+            shouldUseDeviceIdAsUserId =
+                (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
+        }
+
+        if (aliasId == null) {
+            Log.e("VWO", "Please pass a valid alias id.")
+            return
+        }
+
+        VWO.setAlias(userContext, aliasId)
+    }
+
 }

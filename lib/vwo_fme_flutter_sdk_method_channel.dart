@@ -271,6 +271,22 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   }
 
   @override
+  Future<bool> setAlias(VWOUserContext context, String aliasId) async {
+    try {
+      final Map<String, dynamic> arguments = {
+        'aliasId': aliasId,
+        'context': context.toMap(),
+      };
+
+      final result =
+          await methodChannel.invokeMethod<bool>('setAlias', arguments);
+      return result ?? false;
+    } on PlatformException catch (e) {
+      throw Exception("Error: ${e.code}, ${e.message}");
+    }
+  }
+
+  @override
   Future<bool> setSessionData(Map<String, dynamic> sessionData) async {
     try {
       return await methodChannel.invokeMethod('setSessionData', sessionData) ??

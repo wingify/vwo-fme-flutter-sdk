@@ -80,7 +80,11 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
     throw UnimplementedError('setAttribute() has not been implemented.');
   }
 
-  Future<bool> setSessionData(Map<String, dynamic> sessionData){
+  Future<bool> setAlias(VWOUserContext context, String aliasId) async {
+    throw UnimplementedError('setAlias() has not been implemented.');
+  }
+
+  Future<bool> setSessionData(Map<String, dynamic> sessionData) {
     throw UnimplementedError('setSessionData() has not been implemented.');
   }
 }
