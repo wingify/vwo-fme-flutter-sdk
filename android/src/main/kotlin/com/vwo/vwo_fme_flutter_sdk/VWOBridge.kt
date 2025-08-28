@@ -450,8 +450,6 @@ class VWOBridge(private val context: Context) {
         val contextMap = call.argument<Map<String, Any>>("context")
         val aliasId = (call.argument<String>("aliasId") as? String)
 
-        Log.i("VWO", "Got some data across the method channel | $aliasId -> contextMap: $contextMap")
-
         val userContext = VWOUserContext().apply {
             id = (contextMap?.get("id") as? String)
             shouldUseDeviceIdAsUserId =
@@ -459,7 +457,8 @@ class VWOBridge(private val context: Context) {
         }
 
         if (aliasId == null) {
-            Log.e("VWO", "Please pass a valid alias id.")
+
+            result.error("VWO", "Please pass a valid alias id.")
             return
         }
 

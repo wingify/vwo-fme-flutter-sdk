@@ -141,9 +141,6 @@ class VWO {
     VWOUserContext context,
     String aliasId,
   ) async {
-    print(
-        "setAlias called with | aliasId: ${aliasId} and context: ${context.toMap()}");
-
     try {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
