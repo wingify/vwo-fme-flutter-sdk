@@ -458,9 +458,8 @@ class VWOBridge(private val context: Context) {
                 (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
         }
 
-        if (aliasId == null) {
-
-            result.error("VWO", "Please pass a valid alias id.")
+        if (aliasId == null || aliasId.isBlank()) {
+            result.error("VWO", "aliasId parameter is required and cannot be null or empty.", null)
             return
         }
 
