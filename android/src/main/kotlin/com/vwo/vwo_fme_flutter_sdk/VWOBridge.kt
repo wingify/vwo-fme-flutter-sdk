@@ -83,6 +83,7 @@ class VWOBridge(private val context: Context) {
         val isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Boolean ?: false
         val vwoMeta = args["_vwo_meta"] as? Map<String, Any> ?: mapOf()
         val hasIntegrations = args["hasIntegrations"] as? Boolean ?: false
+        val isAliasingEnabled = args["isAliasingEnabled"] as? Boolean ?: false
 
         val vwoInitOptions = VWOInitOptions().apply {
             this.sdkKey = sdkKey
@@ -121,6 +122,7 @@ class VWOBridge(private val context: Context) {
             this.sdkName = SDK_NAME
             this.isUsageStatsDisabled = isUsageStatsDisabled
             this._vwo_meta = vwoMeta
+            this.isAliasingEnabled = isAliasingEnabled
         }
 
         // Only set integrations if provided by the client

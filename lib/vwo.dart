@@ -145,13 +145,12 @@ class VWO {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
-      await plugin?.setAlias(context, aliasId);
+      await plugin.setAlias(context, aliasId);
 
       return true;
     } catch (e) {
       return false;
     }
-    return false;
   }
 
   static void logMessage(String message) {

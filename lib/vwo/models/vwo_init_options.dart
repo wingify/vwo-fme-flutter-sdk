@@ -33,6 +33,9 @@ class VWOInitOptions {
   /// Internal meta data for VWO use.
   Map<String, dynamic> vwo_meta = {};
 
+  /// Optional: if aliasing is enabled
+  bool? isAliasingEnabled;
+
   VWOInitOptions({
     required this.sdkKey,
     required this.accountId,
@@ -43,7 +46,8 @@ class VWOInitOptions {
     this.integrations,
     this.batchMinSize = -1,
     this.batchUploadTimeInterval = -1,
-    this.isUsageStatsDisabled = false
+    this.isUsageStatsDisabled = false,
+    this.isAliasingEnabled = false
   });
 
   @override
@@ -59,6 +63,7 @@ class VWOInitOptions {
         'batchMinSize: $batchMinSize, '
         'batchUploadTimeInterval: $batchUploadTimeInterval, '
         'isUsageStatsDisabled: $isUsageStatsDisabled, '
-        'vwo_meta: $vwo_meta)';
+        'vwo_meta: $vwo_meta, '
+        'isAliasingEnabled: $isAliasingEnabled)';
   }
 }

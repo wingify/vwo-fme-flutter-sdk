@@ -17,6 +17,15 @@ final userContext = VWOUserContext(
 );
 ```
 
+- Support to set user Alias
+```dart
+final vwoInitOptions = VWOInitOptions(
+    isAliasingEnabled: true // enable aliasing
+)
+// at some point after init
+vwo?.setAlias(context, "user_alias");
+```
+
 [1.6.4] - 2025-07-25
 
 ### Added
