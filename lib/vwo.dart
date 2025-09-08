@@ -137,6 +137,17 @@ class VWO {
     }
   }
 
+  /// Sets an alias for the current user in VWO.
+  /// This method allows you to associate an alias ID with a user context for tracking purposes.
+  /// 
+  /// The method calls the native platform implementation to set the alias and returns
+  /// a boolean indicating success or failure.
+  /// 
+  /// [context] The user context containing user ID and configuration options
+  /// [aliasId] The alias identifier to set for the user (required, cannot be null or empty)
+  /// 
+  /// Returns `true` if the alias was set successfully, `false` if there was an error
+  /// or if the plugin is not available. Returns `null` if the method cannot be executed.
   Future<bool>? setAlias(
     VWOUserContext context,
     String aliasId,

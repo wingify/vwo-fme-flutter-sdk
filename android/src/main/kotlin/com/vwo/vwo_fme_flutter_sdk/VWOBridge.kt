@@ -438,8 +438,18 @@ class VWOBridge(private val context: Context) {
         }
     }
 
+    /**
+     * Sets an alias for the current user in VWO.
+     * This method allows you to associate an alias ID with a user context for tracking purposes.
+     * 
+     * @param call MethodCall containing the following arguments:
+     *   - "aliasId": String - The alias identifier to set for the user (required, cannot be null or empty)
+     *   - "context": Map<String, Any> - User context containing:
+     *     - "id": String - User identifier
+     *     - "shouldUseDeviceIdAsUserId": Boolean - Whether to use device ID as user ID (optional, defaults to false)
+     * @param result Result object to return success/error status to Flutter
+     */
     fun setAlias(call: MethodCall, result: Result) {
-
 
         if (vwo == null) {
 
