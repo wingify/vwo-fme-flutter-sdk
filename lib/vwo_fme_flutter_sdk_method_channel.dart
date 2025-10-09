@@ -77,6 +77,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       '_vwo_meta': stats,
       'sdkVersion': sdkVersion,
       'isUsageStatsDisabled': options.isUsageStatsDisabled,
+      'isAliasingEnabled': options.isAliasingEnabled,
       'hasIntegrations': options.integrations != null
     };
 

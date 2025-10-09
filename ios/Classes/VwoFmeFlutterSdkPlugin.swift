@@ -27,6 +27,7 @@ private let IOS_GET_FLAG = "getFlag" // Use IOS_ prefix for iOS-specific constan
 private let IOS_TRACK_EVENT = "trackEvent" // Use IOS_ prefix for iOS-specific constants
 private let IOS_SET_ATTRIBUTE = "setAttribute"
 private let IOS_SET_SESSION = "setSessionData"
+private let IOS_SET_ALIAS = "setAlias"
 
 /// The VWO FME Flutter SDK plugin for iOS.
 ///
@@ -76,7 +77,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             setAttribute(call, result: result)
         case IOS_SET_SESSION:
             setSessionData(call, result: result)
-
+        case IOS_SET_ALIAS:
+            setAlias(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -104,6 +106,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Bool ?? false
         let vwoMeta = args["_vwo_meta"] as? [String: Any] ?? [:]
         let hasIntegrations = args["hasIntegrations"] as? Bool ?? false
+        let isAliasingEnabled = args["isAliasingEnabled"] as? Bool ?? false
 
         var batchUploadTimeInterval: Int64 = -1
         if let batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String {
@@ -137,6 +140,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                         sdkVersion: sdkVersion,
                                         logTransport: self.logTransport,
                                         isUsageStatsDisabled: isUsageStatsDisabled,
+                                        isAliasingEnabled: isAliasingEnabled,
                                         vwoMeta: vwoMeta)
 
         VWOFme.initialize(options: vwoOptions) { initResult in
@@ -147,6 +151,23 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
             }
         }
+    }
+
+    private func setAlias(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let aliasId = args["aliasId"] as? String,
+              let context = args["context"] as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "aliasId and context are required", details: nil))
+            return
+        }
+        let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
+        let userContext = VWOUserContext(id: context["id"] as? String,
+                                    customVariables: context["customVariables"] as? [String: Any] ?? [:],
+                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId)
+        VWOFme.setAlias(userContext, aliasId)
+        let response: [String: Bool] = ["success": true]
+        result(response)
+
     }
 
     /// Executes the integration callback with the given properties.
