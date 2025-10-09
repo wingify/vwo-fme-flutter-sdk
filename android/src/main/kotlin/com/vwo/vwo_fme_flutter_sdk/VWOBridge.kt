@@ -474,7 +474,7 @@ class VWOBridge(private val context: Context) {
         }
 
         VWO.setAlias(userContext, aliasId)
-        result.success("Alias set successfully.")
+        result.success(true)
     }
 
 }

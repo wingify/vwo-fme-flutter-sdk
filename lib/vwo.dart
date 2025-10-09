@@ -28,7 +28,6 @@ import 'vwo_fme_flutter_sdk_platform_interface.dart';
 /// This class provides methods for initializing the SDK, getting feature flags,
 /// tracking events, and setting user attributes.
 class VWO {
-
   VwoFmeFlutterSdkPlatform? _fmePlugin;
 
   /// Initializes the VWO SDK.
@@ -122,9 +121,7 @@ class VWO {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
-      return plugin.setAttribute(
-          attributes: attributes,
-          userContext: context);
+      return plugin.setAttribute(attributes: attributes, userContext: context);
     } catch (e) {
       String details;
       if (e is PlatformException) {
@@ -139,13 +136,13 @@ class VWO {
 
   /// Sets an alias for the current user in VWO.
   /// This method allows you to associate an alias ID with a user context for tracking purposes.
-  /// 
+  ///
   /// The method calls the native platform implementation to set the alias and returns
   /// a boolean indicating success or failure.
-  /// 
+  ///
   /// [context] The user context containing user ID and configuration options
   /// [aliasId] The alias identifier to set for the user (required, cannot be null or empty)
-  /// 
+  ///
   /// Returns `true` if the alias was set successfully, `false` if there was an error
   /// or if the plugin is not available. Returns `null` if the method cannot be executed.
   Future<bool>? setAlias(
@@ -156,9 +153,7 @@ class VWO {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
-      await plugin.setAlias(context, aliasId);
-
-      return true;
+      return await plugin.setAlias(context, aliasId);
     } catch (e) {
       return false;
     }

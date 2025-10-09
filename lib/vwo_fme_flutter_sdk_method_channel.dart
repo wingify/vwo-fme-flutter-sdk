@@ -280,8 +280,8 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       };
 
       final result =
-          await methodChannel.invokeMethod<bool>('setAlias', arguments);
-      return result ?? false;
+          await methodChannel.invokeMethod<dynamic>('setAlias', arguments);
+      return (result is bool) ? result : false;
     } on PlatformException catch (e) {
       throw Exception("Error: ${e.code}, ${e.message}");
     }
