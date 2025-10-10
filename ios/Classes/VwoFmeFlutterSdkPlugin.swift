@@ -202,8 +202,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         // Initialize VWOUserContext with id, customVariables, shouldUseDeviceIdAsUserId
         let shouldUseDeviceIdAsUserId = usrContext["shouldUseDeviceIdAsUserId"] as? Bool ?? false
         let userContext = VWOUserContext(id: usrContext["id"] as? String,
-                                    customVariables: usrContext["customVariables"] as? [String: Any] ?? [:],
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId)
+                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
+                                    customVariables: usrContext["customVariables"] as? [String: Any] ?? [:])
 
         // Call VWOFme.getFlag with the initialized VWOUserContext
         VWOFme.getFlag(featureKey: flagName, context: userContext) { flag in
@@ -232,8 +232,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
 
         let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
         let userContext = VWOUserContext(id: context["id"] as? String,
-                                    customVariables: context["customVariables"] as? [String: Any] ?? [:],
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId)
+                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
+                                    customVariables: context["customVariables"] as? [String: Any] ?? [:])
 
         // Call the VWO SDK's trackEvent method
         if let properties = eventProperties {
@@ -260,8 +260,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
 
         let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
         let userContext = VWOUserContext(id: context["id"] as? String,
-                                    customVariables: context["customVariables"] as? [String: Any] ?? [:],
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId)
+                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
+                                    customVariables: context["customVariables"] as? [String: Any] ?? [:])
         VWOFme.setAttribute(attributes: attributes, context: userContext)
         result(true)
     }
