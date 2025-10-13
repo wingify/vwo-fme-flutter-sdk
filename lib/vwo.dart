@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
+import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_user_context.dart';
 import 'package:vwo_fme_flutter_sdk/vwo_fme_flutter_sdk_method_channel.dart';
 
 import 'vwo_fme_flutter_sdk_platform_interface.dart';
@@ -56,16 +56,16 @@ class VWO {
 
   /// Gets the value of a feature flag.
   ///
-  /// [flagName] The name of the feature flag.
-  /// [vwoContext] The user context for evaluating the flag.
+  /// [featureKey] The name of the feature flag.
+  /// [context] The user context for evaluating the flag.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   Future<GetFlag?> getFlag({
-    required String flagName,
-    required VWOContext vwoContext,
+    required String featureKey,
+    required VWOUserContext context,
   }) async {
     try {
-      return _fmePlugin?.getFlag(flagName: flagName, vwoContext: vwoContext);
+      return _fmePlugin?.getFlag(featureKey: featureKey, userContext: context);
     } catch (e) {
       String details;
       if (e is PlatformException) {
@@ -81,19 +81,19 @@ class VWO {
   /// Tracks an event.
   ///
   /// [eventName] The name of the event.
-  /// [vwoContext] The VWO context for the event.
+  /// [context] The VWO context for the event.
   /// [eventProperties] Optional properties associated with the event.
   ///
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   Future<Map<String, bool>?> trackEvent({
     required String eventName,
-    required VWOContext vwoContext,
+    required VWOUserContext context,
     Map<String, dynamic>? eventProperties,
   }) async {
     try {
       return _fmePlugin?.trackEvent(
           eventName: eventName,
-          vwoContext: vwoContext,
+          userContext: context,
           eventProperties: eventProperties);
     } catch (e) {
       String details;
@@ -111,22 +111,20 @@ class VWO {
   ///
   /// [attributeKey] The key of the attribute.
   /// [attributeValue] The value of the attribute.
-  /// [vwoContext] The user context for the attribute.
+  /// [context] The user context for the attribute.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   Future<bool>? setAttribute({
-    required String attributeKey,
-    required dynamic attributeValue,
-    required VWOContext vwoContext,
+    required Map<String, dynamic> attributes,
+    required VWOUserContext context,
   }) async {
     try {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
       return plugin.setAttribute(
-          attributeKey: attributeKey,
-          attributeValue: attributeValue,
-          vwoContext: vwoContext);
+          attributes: attributes,
+          userContext: context);
     } catch (e) {
       String details;
       if (e is PlatformException) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2025 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_context.dart';
 
+import 'vwo/models/vwo_user_context.dart';
 import 'vwo_fme_flutter_sdk_method_channel.dart';
 
 abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
@@ -42,13 +42,13 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
 
   /// Gets the value of a feature flag.
   ///
-  /// [flagName] The name of the feature flag.
-  /// [vwoContext] The user context for evaluating the flag.
+  /// [featureKey] The name of the feature flag.
+  /// [context] The user context for evaluating the flag.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   Future<GetFlag?> getFlag({
-    required String flagName,
-    required VWOContext vwoContext,
+    required String featureKey,
+    required VWOUserContext userContext,
   }) {
     throw UnimplementedError('getFlag() has not been implemented.');
   }
@@ -62,7 +62,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   Future<Map<String, bool>> trackEvent({
     required String eventName,
-    required VWOContext vwoContext,
+    required VWOUserContext userContext,
     Map<String, dynamic>? eventProperties,
   }) {
     throw UnimplementedError('trackEvent() has not been implemented.');
@@ -70,16 +70,26 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
 
   /// Sets a user attribute.
   ///
-  /// [attributeKey] The key of the attribute.
-  /// [attributeValue] The value of the attribute.
+  /// [attributes] The map of the attributes.
   /// [context] The user context for the attribute.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
-  Future<bool> setAttribute({
-    required String attributeKey,
-    required dynamic attributeValue,
-    required VWOContext vwoContext,
-  }) {
+  Future<bool> setAttribute(
+      {required Map<String, dynamic> attributes,
+      required VWOUserContext userContext}) {
     throw UnimplementedError('setAttribute() has not been implemented.');
+  }
+
+  Future<bool> setSessionData(Map<String, dynamic> sessionData) {
+    throw UnimplementedError('setSessionData() has not been implemented.');
+  }
+
+  /// Sends SDK initialization event with timing information.
+  ///
+  /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
+  ///
+  /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
+  Future<bool> sendSdkInitEvent(int sdkInitTime) {
+    throw UnimplementedError('sendSdkInitEvent() has not been implemented.');
   }
 }
