@@ -21,7 +21,10 @@ dependencies:
   vwo_fme_flutter_sdk: ^<latestVersion>
 ```
 
-Then run:
+Latest version of SDK can be found in [pub.dev](https://pub.dev/packages/vwo_fme_flutter_sdk)
+
+For iOS, install the CocoaPods dependencies by running below command. Supports iOS version 12.0 and above.
+
 ```bash
 flutter pub get
 ```
