@@ -140,8 +140,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                         sdkVersion: sdkVersion,
                                         logTransport: self.logTransport,
                                         isUsageStatsDisabled: isUsageStatsDisabled,
-                                        isAliasingEnabled: isAliasingEnabled,
-                                        vwoMeta: vwoMeta)
+                                        vwoMeta: vwoMeta, isAliasingEnabled: isAliasingEnabled)
 
         VWOFme.initialize(options: vwoOptions) { initResult in
             switch initResult {
@@ -162,9 +161,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         }
         let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
         let userContext = VWOUserContext(id: context["id"] as? String,
-                                    customVariables: context["customVariables"] as? [String: Any] ?? [:],
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId)
-        VWOFme.setAlias(userContext, aliasId)
+                                         shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId, customVariables: context["customVariables"] as? [String: Any] ?? [:])
+        VWOFme.setAlias(from: userContext, to: aliasId)
         let response: [String: Bool] = ["success": true]
         result(response)
 
