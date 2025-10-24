@@ -439,9 +439,39 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
+     * Function to send SDK initialization event with timing information.
+     */
+    fun sendSdkInitEvent(call: MethodCall, result: Result) {
+        try {
+            val sdkInitTimeStr = call.argument<String>("sdkInitTime")
+
+            if (sdkInitTimeStr == null) {
+                result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
+                return
+            }
+
+            val sdkInitTime = sdkInitTimeStr.toLongOrNull()
+            if (sdkInitTime == null) {
+                result.error("INVALID_ARGUMENTS", "sdkInitTime must be a valid number", null)
+                return
+            }
+
+            // Call the native VWO SDK's sendSdkInitEvent method
+            vwo?.sendSdkInitEvent(sdkInitTime)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error(
+                "SEND_SDK_INIT_EVENT_ERROR",
+                "Error while sending SDK init event: ${e.message}",
+                e.stackTraceToString()
+            )
+        }
+    }
+
+    /**
      * Sets an alias for the current user in VWO.
      * This method allows you to associate an alias ID with a user context for tracking purposes.
-     * 
+     *
      * @param call MethodCall containing the following arguments:
      *   - "aliasId": String - The alias identifier to set for the user (required, cannot be null or empty)
      *   - "context": Map<String, Any> - User context containing:

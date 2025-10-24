@@ -87,4 +87,13 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   Future<bool> setSessionData(Map<String, dynamic> sessionData) {
     throw UnimplementedError('setSessionData() has not been implemented.');
   }
+
+  /// Sends SDK initialization event with timing information.
+  ///
+  /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
+  ///
+  /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
+  Future<bool> sendSdkInitEvent(int sdkInitTime) {
+    throw UnimplementedError('sendSdkInitEvent() has not been implemented.');
+  }
 }
