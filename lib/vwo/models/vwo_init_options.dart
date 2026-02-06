@@ -30,6 +30,9 @@ class VWOInitOptions {
   /// Optional: Usage stats should always be collected, don't collect if [isUsageStatsDisabled] flag is true
   bool isUsageStatsDisabled = false;
 
+  /// Optional: Enable aliasing feature for linking temporary user IDs to original user IDs
+  bool isAliasingEnabled = false;
+
   /// Internal meta data for VWO use.
   Map<String, dynamic> vwo_meta = {};
 
@@ -43,7 +46,8 @@ class VWOInitOptions {
     this.integrations,
     this.batchMinSize = -1,
     this.batchUploadTimeInterval = -1,
-    this.isUsageStatsDisabled = false
+    this.isUsageStatsDisabled = false,
+    this.isAliasingEnabled = false
   });
 
   @override
@@ -59,6 +63,7 @@ class VWOInitOptions {
         'batchMinSize: $batchMinSize, '
         'batchUploadTimeInterval: $batchUploadTimeInterval, '
         'isUsageStatsDisabled: $isUsageStatsDisabled, '
+        'isAliasingEnabled: $isAliasingEnabled, '
         'vwo_meta: $vwo_meta)';
   }
 }

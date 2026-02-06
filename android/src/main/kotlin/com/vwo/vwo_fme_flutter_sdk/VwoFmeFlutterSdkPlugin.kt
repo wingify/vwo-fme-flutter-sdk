@@ -61,6 +61,12 @@ class VwoFmeFlutterSdkPlugin : FlutterPlugin, MethodCallHandler {
             VWOConstants.ANDROID_SET_ATTRIBUTE -> {
                 bridge?.setAttribute(call, result)
             }
+            VWOConstants.ANDROID_SET_ALIAS -> {
+                bridge?.setAlias(call, result)
+            }
+            VWOConstants.ANDROID_CLEAR_INSTANCE -> {
+                bridge?.clearInstance(call, result)
+            }
             VWOConstants.ANDROID_SET_SESSION -> {
                 bridge?.setSessionData(call, result)
             }

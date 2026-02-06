@@ -43,12 +43,16 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Gets the value of a feature flag.
   ///
   /// [featureKey] The name of the feature flag.
-  /// [context] The user context for evaluating the flag.
+  /// [userContext] The user context for evaluating the flag.
+  /// [accountId] Optional account ID for multi-instance support.
+  /// [sdkKey] Optional SDK key for multi-instance support.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   Future<GetFlag?> getFlag({
     required String featureKey,
     required VWOUserContext userContext,
+    int? accountId,
+    String? sdkKey,
   }) {
     throw UnimplementedError('getFlag() has not been implemented.');
   }
@@ -56,14 +60,18 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Tracks an event.
   ///
   /// [eventName] The name of the event.
-  /// [context] The user context for the event.
+  /// [userContext] The user context for the event.
   /// [eventProperties] Optional properties associated with the event.
+  /// [accountId] Optional account ID for multi-instance support.
+  /// [sdkKey] Optional SDK key for multi-instance support.
   ///
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   Future<Map<String, bool>> trackEvent({
     required String eventName,
     required VWOUserContext userContext,
     Map<String, dynamic>? eventProperties,
+    int? accountId,
+    String? sdkKey,
   }) {
     throw UnimplementedError('trackEvent() has not been implemented.');
   }
@@ -71,13 +79,48 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Sets a user attribute.
   ///
   /// [attributes] The map of the attributes.
-  /// [context] The user context for the attribute.
+  /// [userContext] The user context for the attribute.
+  /// [accountId] Optional account ID for multi-instance support.
+  /// [sdkKey] Optional SDK key for multi-instance support.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
-  Future<bool> setAttribute(
-      {required Map<String, dynamic> attributes,
-      required VWOUserContext userContext}) {
+  Future<bool> setAttribute({
+    required Map<String, dynamic> attributes,
+    required VWOUserContext userContext,
+    int? accountId,
+    String? sdkKey,
+  }) {
     throw UnimplementedError('setAttribute() has not been implemented.');
+  }
+
+  /// Sets an alias for a user (links temporary user ID to original user ID).
+  ///
+  /// [userContext] The user context containing the temporary user ID.
+  /// [alias] The original/authenticated user ID to link to the temporary ID.
+  /// [accountId] Optional account ID for multi-instance support.
+  /// [sdkKey] Optional SDK key for multi-instance support.
+  ///
+  /// Returns a [Future] that resolves to a boolean indicating the success status of setting the alias.
+  Future<bool> setAlias({
+    required VWOUserContext userContext,
+    required String alias,
+    int? accountId,
+    String? sdkKey,
+  }) {
+    throw UnimplementedError('setAlias() has not been implemented.');
+  }
+
+  /// Clears a specific VWO instance.
+  ///
+  /// [accountId] The account ID of the instance to clear.
+  /// [sdkKey] The SDK key of the instance to clear.
+  ///
+  /// Returns a [Future] that resolves to a boolean indicating the success status of clearing the instance.
+  Future<bool> clearInstance({
+    required int accountId,
+    required String sdkKey,
+  }) {
+    throw UnimplementedError('clearInstance() has not been implemented.');
   }
 
   Future<bool> setSessionData(Map<String, dynamic> sessionData) {

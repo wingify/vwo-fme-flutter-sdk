@@ -80,6 +80,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       '_vwo_meta': stats,
       'sdkVersion': sdkVersion,
       'isUsageStatsDisabled': options.isUsageStatsDisabled,
+      'isAliasingEnabled': options.isAliasingEnabled,
       'hasIntegrations': options.integrations != null
     };
 
@@ -201,12 +202,21 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   Future<GetFlag> getFlag({
     required String featureKey,
     required VWOUserContext userContext,
+    int? accountId,
+    String? sdkKey,
   }) async {
     try {
-      final dynamic result = await methodChannel.invokeMethod('getFlag', {
+      final Map<String, dynamic> arguments = {
         'flagName': featureKey,
         'userContext': userContext.toMap(),
-      });
+      };
+      if (accountId != null) {
+        arguments['accountId'] = accountId;
+      }
+      if (sdkKey != null) {
+        arguments['sdkKey'] = sdkKey;
+      }
+      final dynamic result = await methodChannel.invokeMethod('getFlag', arguments);
 
       // Explicitly cast the result to Map<String, dynamic> if possible
       if (result is Map) {
@@ -239,15 +249,26 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     required String eventName,
     required VWOUserContext userContext,
     Map<String, dynamic>? eventProperties,
+    int? accountId,
+    String? sdkKey,
   }) async {
     try {
+      final Map<String, dynamic> arguments = {
+        'eventName': eventName,
+        'context': userContext.toMap(),
+      };
+      if (eventProperties != null) {
+        arguments['eventProperties'] = eventProperties;
+      }
+      if (accountId != null) {
+        arguments['accountId'] = accountId;
+      }
+      if (sdkKey != null) {
+        arguments['sdkKey'] = sdkKey;
+      }
       final result = await methodChannel.invokeMethod<Map<Object?, Object?>>(
         'trackEvent',
-        {
-          'eventName': eventName,
-          'context': userContext.toMap(),
-          'eventProperties': eventProperties,
-        },
+        arguments,
       );
       if (result == null) {
         throw Exception("No data returned from native code.");
@@ -267,16 +288,71 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   @override
-  Future<bool> setAttribute(
-      {required Map<String, dynamic> attributes,
-      required VWOUserContext userContext}) async {
+  Future<bool> setAttribute({
+    required Map<String, dynamic> attributes,
+    required VWOUserContext userContext,
+    int? accountId,
+    String? sdkKey,
+  }) async {
     try {
       final Map<String, dynamic> arguments = {
         'attributes': attributes,
         'context': userContext.toMap(),
       };
+      if (accountId != null) {
+        arguments['accountId'] = accountId;
+      }
+      if (sdkKey != null) {
+        arguments['sdkKey'] = sdkKey;
+      }
       final result =
           await methodChannel.invokeMethod<bool>('setAttribute', arguments);
+      return result ?? false;
+    } on PlatformException catch (e) {
+      // Handle errors from the native side
+      throw Exception("Error: ${e.code}, ${e.message}");
+    }
+  }
+
+  @override
+  Future<bool> setAlias({
+    required VWOUserContext userContext,
+    required String alias,
+    int? accountId,
+    String? sdkKey,
+  }) async {
+    try {
+      final Map<String, dynamic> arguments = {
+        'userContext': userContext.toMap(),
+        'alias': alias,
+      };
+      if (accountId != null) {
+        arguments['accountId'] = accountId;
+      }
+      if (sdkKey != null) {
+        arguments['sdkKey'] = sdkKey;
+      }
+      final result = await methodChannel.invokeMethod<bool>('setAlias', arguments);
+      return result ?? false;
+    } on PlatformException catch (e) {
+      // Handle errors from the native side
+      throw Exception("Error: ${e.code}, ${e.message}");
+    }
+  }
+
+  @override
+  Future<bool> clearInstance({
+    required int accountId,
+    required String sdkKey,
+  }) async {
+    try {
+      final result = await methodChannel.invokeMethod<bool>(
+        'clearInstance',
+        {
+          'accountId': accountId,
+          'sdkKey': sdkKey,
+        },
+      );
       return result ?? false;
     } on PlatformException catch (e) {
       // Handle errors from the native side

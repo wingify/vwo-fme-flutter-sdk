@@ -26,6 +26,8 @@ private let INITIALIZE_VWO = "init"
 private let IOS_GET_FLAG = "getFlag" // Use IOS_ prefix for iOS-specific constants
 private let IOS_TRACK_EVENT = "trackEvent" // Use IOS_ prefix for iOS-specific constants
 private let IOS_SET_ATTRIBUTE = "setAttribute"
+private let IOS_SET_ALIAS = "setAlias"
+private let IOS_CLEAR_INSTANCE = "clearInstance"
 private let IOS_SET_SESSION = "setSessionData"
 private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 
@@ -46,6 +48,28 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
     private var methodChannel: FlutterMethodChannel?
 
     private var logTransport: LogTransport?
+    
+    /// Helper method to get VWO instance from native SDK
+    /// 
+    /// - Parameters:
+    ///   - accountId: The account ID for the instance (optional)
+    ///   - sdkKey: The SDK key for the instance (optional)
+    /// 
+    /// - Returns: The VWO instance if found, or nil if not provided/available
+    /// 
+    /// Note: The native SDK caches instances internally, so calling getInstance()
+    /// multiple times with the same accountId/sdkKey is efficient.
+    private func getVWOInstance(accountId: Int?, sdkKey: String?) -> VWOFme? {
+        guard let accountId = accountId, 
+              let sdkKey = sdkKey,
+              !sdkKey.isEmpty else {
+            // If not provided, return nil (native SDK will handle default)
+            return nil
+        }
+        // Use native SDK's getInstance method directly
+        // The native SDK caches instances internally, so this is efficient
+        return VWOFme.getInstance(accountId: accountId, sdkKey: sdkKey)
+    }
 
     /// Registers the plugin with the Flutter framework.
     /// - Parameter registrar: The Flutter plugin registrar.
@@ -75,6 +99,10 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             trackEvent(call, result: result)
         case IOS_SET_ATTRIBUTE:
             setAttribute(call, result: result)
+        case IOS_SET_ALIAS:
+            setAlias(call, result: result)
+        case IOS_CLEAR_INSTANCE:
+            clearInstance(call, result: result)
         case IOS_SET_SESSION:
             setSessionData(call, result: result)
         case IOS_SEND_SDK_INIT_EVENT:
@@ -107,6 +135,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Bool ?? false
         let vwoMeta = args["_vwo_meta"] as? [String: Any] ?? [:]
         let hasIntegrations = args["hasIntegrations"] as? Bool ?? false
+        let isAliasingEnabled = args["isAliasingEnabled"] as? Bool ?? false
 
         var batchUploadTimeInterval: Int64 = -1
         if let batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String {
@@ -114,9 +143,13 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         }
 
         var logLevel: LogLevelEnum = .error
-        if let loggerLevel = logger?["level"] as? String,
-           let level = LogLevelEnum(rawValue: loggerLevel.uppercased()) {
-            logLevel = level
+        if let loggerLevel = logger?["level"] as? String {
+            let normalizedLevel = loggerLevel.lowercased()
+            if let level = LogLevelEnum(rawValue: normalizedLevel) {
+                logLevel = level
+            } else {
+                print("VWO Flutter Plugin: Invalid log level received: \(loggerLevel). Falling back to .error")
+            }
         }
         
         // Initialize the logger
@@ -140,11 +173,14 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                         sdkVersion: sdkVersion,
                                         logTransport: self.logTransport,
                                         isUsageStatsDisabled: isUsageStatsDisabled,
-                                        vwoMeta: vwoMeta)
+                                        vwoMeta: vwoMeta,
+                                        storage: nil,
+                                        isAliasingEnabled: isAliasingEnabled)
 
         VWOFme.initialize(options: vwoOptions) { initResult in
             switch initResult {
             case .success(let message):
+                // Native SDK manages instances internally, no need to store here
                 result(message)
             case .failure(let error):
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
@@ -181,17 +217,33 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
+        // Get accountId and sdkKey for multi-instance support (optional)
+        let accountId = args["accountId"] as? Int
+        let sdkKey = args["sdkKey"] as? String
+
         // Initialize VWOUserContext with id, customVariables
         let userContext = VWOUserContext(id: usrContext["id"] as? String,
                                     customVariables: usrContext["customVariables"] as? [String: Any] ?? [:])
 
-        // Call VWOFme.getFlag with the initialized VWOUserContext
-        VWOFme.getFlag(featureKey: flagName, context: userContext) { flag in
-            let flagResult: [String: Any] = [
-                "isEnabled": flag.isEnabled(),
-                "variables": flag.getVariables(),
-            ]
-            result(flagResult)
+        // Get the appropriate instance or use default
+        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+            // Use instance method
+            instance.getFlag(featureKey: flagName, context: userContext) { flag in
+                let flagResult: [String: Any] = [
+                    "isEnabled": flag.isEnabled(),
+                    "variables": flag.getVariables(),
+                ]
+                result(flagResult)
+            }
+        } else {
+            // Fallback to static method (default instance)
+            VWOFme.getFlag(featureKey: flagName, context: userContext) { flag in
+                let flagResult: [String: Any] = [
+                    "isEnabled": flag.isEnabled(),
+                    "variables": flag.getVariables(),
+                ]
+                result(flagResult)
+            }
         }
     }
 
@@ -208,16 +260,30 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
+        // Get accountId and sdkKey for multi-instance support (optional)
+        let accountId = args["accountId"] as? Int
+        let sdkKey = args["sdkKey"] as? String
+
         let eventProperties = args["eventProperties"] as? [String: Any]
 
         let userContext = VWOUserContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
 
-        // Call the VWO SDK's trackEvent method
-        if let properties = eventProperties {
-            VWOFme.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
+        // Get the appropriate instance or use default
+        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+            // Use instance method
+            if let properties = eventProperties {
+                instance.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
+            } else {
+                instance.trackEvent(eventName: eventName, context: userContext)
+            }
         } else {
-            VWOFme.trackEvent(eventName: eventName, context: userContext)
+            // Fallback to static method (default instance)
+            if let properties = eventProperties {
+                VWOFme.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
+            } else {
+                VWOFme.trackEvent(eventName: eventName, context: userContext)
+            }
         }
         let response: [String: Bool] = ["success": true]
         result(response)
@@ -236,9 +302,71 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
+        // Get accountId and sdkKey for multi-instance support (optional)
+        let accountId = args["accountId"] as? Int
+        let sdkKey = args["sdkKey"] as? String
+
         let userContext = VWOUserContext(id: context["id"] as? String,
                                     customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        VWOFme.setAttribute(attributes: attributes, context: userContext)
+        
+        // Get the appropriate instance from native SDK
+        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+            // Use instance method
+            instance.setAttribute(attributes: attributes, context: userContext)
+        } else {
+            // Fallback to static method (default instance)
+            VWOFme.setAttribute(attributes: attributes, context: userContext)
+        }
+        result(true)
+    }
+
+    /// Sets an alias for a user (links temporary user ID to original user ID).
+    ///
+    /// - Parameters:
+    ///   - call: The method call.
+    ///   - result: The result callback.
+    private func setAlias(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let userContextDict = args["userContext"] as? [String: Any],
+              let alias = args["alias"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "userContext and alias are required", details: nil))
+            return
+        }
+
+        // Get accountId and sdkKey for multi-instance support (optional)
+        let accountId = args["accountId"] as? Int
+        let sdkKey = args["sdkKey"] as? String
+
+        let userContext = VWOUserContext(id: userContextDict["id"] as? String,
+                                    customVariables: userContextDict["customVariables"] as? [String: Any] ?? [:])
+        
+        // Get the appropriate instance from native SDK
+        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+            // Use instance method
+            instance.setAlias(from: userContext, to: alias)
+        } else {
+            // Fallback to static method (default instance)
+            VWOFme.setAlias(from: userContext, to: alias)
+        }
+        result(true)
+    }
+
+    /// Clears a specific VWO instance.
+    ///
+    /// - Parameters:
+    ///   - call: The method call.
+    ///   - result: The result callback.
+    private func clearInstance(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let accountId = args["accountId"] as? Int,
+              let sdkKey = args["sdkKey"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "accountId and sdkKey are required", details: nil))
+            return
+        }
+        
+        // Clear from native SDK (native SDK manages instances internally)
+        VWOFme.clearInstance(accountId: accountId, sdkKey: sdkKey)
+        
         result(true)
     }
 
@@ -272,7 +400,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         }
 
         // Call the native VWO SDK's sendSdkInitEvent method
-        VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+//        VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
         result(true)
     }
 }
