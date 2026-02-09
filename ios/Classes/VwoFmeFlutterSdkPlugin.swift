@@ -400,7 +400,18 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         }
 
         // Call the native VWO SDK's sendSdkInitEvent method
-//        VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        let accountId = args["accountId"] as? Int
+        let sdkKey = args["sdkKey"] as? String
+
+        // Get the appropriate instance or use default
+        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+            // Use instance method
+            instance.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        } else {
+            // Fallback to static method (default instance)
+            VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        }
+
         result(true)
     }
 }
