@@ -52,11 +52,11 @@ class VWOBridge(private val context: Context) {
 
     /**
      * Helper method to get VWO instance from native SDK
-     * 
+     *
      * @param accountId The account ID for the instance (optional)
      * @param sdkKey The SDK key for the instance (optional)
      * @return The VWO instance if found, or null if not provided/available
-     * 
+     *
      * Note: The native SDK caches instances internally, so calling getInstance()
      * multiple times with the same accountId/sdkKey is efficient.
      */
@@ -74,7 +74,7 @@ class VWOBridge(private val context: Context) {
     /**
      * Initializes VWO-FME sdk sending the desired parameters to native SDK.
      */
-    fun initializeVWO(call:MethodCall, result: Result, channel: MethodChannel) {
+    fun initializeVWO(call: MethodCall, result: Result, channel: MethodChannel) {
 
         val args = call.arguments as? Map<*, *> ?: run {
             result.error("INVALID_ARGUMENTS", "Arguments should be a map", null)
@@ -240,8 +240,12 @@ class VWOBridge(private val context: Context) {
             // Create VWOUserContext from userContextMap
             val userContext = VWOUserContext().apply {
                 id = userContextMap["id"] as? String
-                customVariables.putAll(userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap())
-                variationTargetingVariables.putAll(userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap())
+                customVariables.putAll(
+                    userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap()
+                )
+                variationTargetingVariables.putAll(
+                    userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap()
+                )
             }
 
             // Handle gatewayService if present
@@ -258,14 +262,32 @@ class VWOBridge(private val context: Context) {
             handleGetFlag(vwoInstance, flagName, userContext, result)
         } catch (e: Exception) {
             // Handle unexpected errors
-            result.error("UNEXPECTED_ERROR", "An unexpected error occurred: ${e.message}", e.stackTraceToString())
+            result.error(
+                "UNEXPECTED_ERROR",
+                "An unexpected error occurred: ${e.message}",
+                e.stackTraceToString()
+            )
         }
     }
 
-    private fun handleGetFlag(vwoInstance: VWO?, flagName: String, userContext: VWOUserContext, result: Result) {
+    private fun handleGetFlag(
+        vwoInstance: VWO?,
+        flagName: String,
+        userContext: VWOUserContext,
+        result: Result
+    ) {
         try {
             // Use the provided instance or fallback to default instance
-            val instance = vwoInstance ?: VWO.getInstance()
+            val instance = vwoInstance
+            if (instance == null) {
+                result.error(
+                    "UNEXPECTED_ERROR",
+                    "Could not get VWO instance, please ensure VWO is initialized properly.",
+                    null
+                )
+                return
+            }
+            
             instance?.getFlag(flagName, userContext, object : IVwoListener {
                 override fun onSuccess(data: Any) {
                     val featureFlag = data as? GetFlag
@@ -289,7 +311,11 @@ class VWOBridge(private val context: Context) {
             })
         } catch (e: Exception) {
             // Handle unexpected errors in the VWO SDK call
-            result.error("UNEXPECTED_ERROR", "An unexpected error occurred: ${e.message}", e.stackTraceToString())
+            result.error(
+                "UNEXPECTED_ERROR",
+                "An unexpected error occurred: ${e.message}",
+                e.stackTraceToString()
+            )
         }
     }
 
@@ -334,12 +360,24 @@ class VWOBridge(private val context: Context) {
             // Convert the incoming context map to a VWOUserContext object
             val context = VWOUserContext().apply {
                 id = contextMap["id"] as? String
-                customVariables = contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
-                variationTargetingVariables = contextMap["variationTargetingVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
+                customVariables =
+                    contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
+                variationTargetingVariables =
+                    contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
+                        ?: mutableMapOf()
             }
 
             // Use the provided instance or fallback to default instance
-            val instance = vwoInstance ?: VWO.getInstance()
+            val instance = vwoInstance
+
+            if (instance == null) {
+                result.error(
+                    "UNEXPECTED_ERROR",
+                    "Could not get VWO instance, please ensure VWO is initialized properly.",
+                    null
+                )
+                return
+            }
 
             // Call the appropriate `trackEvent` method based on the presence of eventProperties
             val trackingResult = if (eventProperties == null) {
@@ -395,9 +433,9 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-    * Sets an attribute for a user in the context provided.
-    * This method validates the types of the inputs before proceeding with the API call.
-    */
+     * Sets an attribute for a user in the context provided.
+     * This method validates the types of the inputs before proceeding with the API call.
+     */
     private fun handleSetAttribute(
         vwoInstance: VWO?,
         attributes: Map<String, Any>,
@@ -416,7 +454,17 @@ class VWOBridge(private val context: Context) {
             }
 
             // Use the provided instance or fallback to default instance
-            val instance = vwoInstance ?: VWO.getInstance()
+            val instance = vwoInstance
+
+            if (instance == null) {
+                result.error(
+                    "UNEXPECTED_ERROR",
+                    "Could not get VWO instance, please ensure VWO is initialized properly.",
+                    null
+                )
+                return
+            }
+
             instance?.setAttribute(attributes, context)
             result.success(true) // Return success to Flutter
         } catch (e: Exception) {
@@ -440,12 +488,15 @@ class VWOBridge(private val context: Context) {
                     // Include basic data types
                     filteredMap[key] = value
                 }
+
                 is Map<*, *> -> {
                     // Recursively filter nested maps
                     val nestedMap = value as Map<*, *>
-                    val filteredNestedMap = filterBasicDataTypes(nestedMap.mapKeys { it.key.toString() })
+                    val filteredNestedMap =
+                        filterBasicDataTypes(nestedMap.mapKeys { it.key.toString() })
                     filteredMap[key] = filteredNestedMap
                 }
+
                 is List<*> -> {
                     // Recursively filter nested lists
                     val filteredList = value.filterIsInstance<Any>()
@@ -458,6 +509,7 @@ class VWOBridge(private val context: Context) {
                         }
                     filteredMap[key] = filteredList
                 }
+
                 else -> {
                     // Skip other types (e.g., objects)
                     Log.w("VWO", "Skipping non-basic data type for key: $key")
@@ -487,8 +539,16 @@ class VWOBridge(private val context: Context) {
      */
     fun sendSdkInitEvent(call: MethodCall, result: Result) {
         try {
+
+            val accountId = call.argument<String>("accountId") as? Int
+            val sdkKey = call.argument<String>("sdkKey")
+
+            if (accountId == null || sdkKey == null) {
+                result.error("INVALID_ARGUMENTS", "Invalid accountId and sdkKey passed.", null)
+                return
+            }
+
             val sdkInitTimeStr = call.argument<String>("sdkInitTime")
-            
             if (sdkInitTimeStr == null) {
                 result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
                 return
@@ -501,7 +561,7 @@ class VWOBridge(private val context: Context) {
             }
 
             // Use default instance for sendSdkInitEvent
-            val instance = VWO.getInstance()
+            val instance = VWO.getInstance(accountId, sdkKey)
             instance?.sendSdkInitEvent(sdkInitTime)
             result.success(true)
         } catch (e: Exception) {
@@ -515,7 +575,7 @@ class VWOBridge(private val context: Context) {
 
     /**
      * Sets an alias for a user (links temporary user ID to original user ID).
-     * 
+     *
      * @param call The method call containing userContext, alias, accountId, and sdkKey
      * @param result The result callback
      */
@@ -552,7 +612,7 @@ class VWOBridge(private val context: Context) {
             }
 
             // Use the provided instance or fallback to default instance
-            val instance = vwoInstance ?: VWO.getInstance()
+            val instance = vwoInstance ?: VWO.getInstance(accountId, sdkKey)
             instance?.setAlias(context, alias)
             result.success(true)
         } catch (e: Exception) {
@@ -566,7 +626,7 @@ class VWOBridge(private val context: Context) {
 
     /**
      * Clears a specific VWO instance.
-     * 
+     *
      * @param call The method call containing accountId and sdkKey
      * @param result The result callback
      */

@@ -50,7 +50,6 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// or error if the initialization fails.
   static Future<MethodChannelVwoFmeFlutterSdk?> init(
       VWOInitOptions options) async {
-
     // Record the start time for measuring initialization duration
     final initStartTime = DateTime.now().millisecondsSinceEpoch;
 
@@ -97,9 +96,9 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
     // Send SDK initialization event with timing information
     try {
-      await flutterSdk.sendSdkInitEvent(sdkInitTime);
-    } catch (e) {
-    }
+      await flutterSdk.sendSdkInitEvent(
+          sdkInitTime, options.accountId, options.sdkKey);
+    } catch (e) {}
 
     return flutterSdk;
   }
@@ -151,17 +150,13 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// [options] The initialization options for the VWO SDK.
   /// [properties] The properties map received from the native side.
   void _setBridgeCallbackHandler(VWOInitOptions options) {
-
     methodChannel.setMethodCallHandler((call) async {
-
       final Map<String, dynamic> properties =
           Map<String, dynamic>.from(call.arguments);
 
       if (call.method == "onIntegrationCallback") {
-
         options.integrations?.call(properties);
       } else if (call.method == "onLoggerCallback") {
-
         _processLog(properties);
       }
     });
@@ -216,7 +211,8 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       if (sdkKey != null) {
         arguments['sdkKey'] = sdkKey;
       }
-      final dynamic result = await methodChannel.invokeMethod('getFlag', arguments);
+      final dynamic result =
+          await methodChannel.invokeMethod('getFlag', arguments);
 
       // Explicitly cast the result to Map<String, dynamic> if possible
       if (result is Map) {
@@ -332,7 +328,8 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       if (sdkKey != null) {
         arguments['sdkKey'] = sdkKey;
       }
-      final result = await methodChannel.invokeMethod<bool>('setAlias', arguments);
+      final result =
+          await methodChannel.invokeMethod<bool>('setAlias', arguments);
       return result ?? false;
     } on PlatformException catch (e) {
       // Handle errors from the native side
@@ -377,12 +374,15 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
   @override
-  Future<bool> sendSdkInitEvent(int sdkInitTime) async {
+  Future<bool> sendSdkInitEvent(
+      int sdkInitTime, int? accountId, String? sdkKey) async {
     try {
       final result = await methodChannel.invokeMethod<bool>(
         'sendSdkInitEvent',
         {
-          'sdkInitTime': sdkInitTime.toString()
+          'sdkInitTime': sdkInitTime.toString(),
+          'accountId': accountId,
+          'sdkKey': sdkKey,
         }, // Send as String for proper type conversion
       );
       return result ?? false;

@@ -132,7 +132,8 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
-  Future<bool> sendSdkInitEvent(int sdkInitTime) {
+  Future<bool> sendSdkInitEvent(
+      int sdkInitTime, int? accountId, String? sdkKey) {
     throw UnimplementedError('sendSdkInitEvent() has not been implemented.');
   }
 }
