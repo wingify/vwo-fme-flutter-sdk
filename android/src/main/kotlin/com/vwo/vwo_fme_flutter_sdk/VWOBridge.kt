@@ -590,45 +590,15 @@ class VWOBridge(private val context: Context) {
      */
     fun setAlias(call: MethodCall, result: Result) {
 
-        if (vwo == null) {
-
-            val message = "SDK is not initialized, please try again later."
-            result.error("SET_ALIAS_ERROR", message, null)
-            Log.e("VWO", message)
-            return
-        }
-
-        val contextMap = call.argument<Map<String, Any>>("context")
-        val aliasId = (call.argument<String>("aliasId") as? String)
-
-        val userContext = VWOUserContext().apply {
-            id = (contextMap?.get("id") as? String)
-            shouldUseDeviceIdAsUserId =
-                (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
-        }
+        val contextMap = call.argument<Map<String, Any>>("userContext")
+        val aliasId = (call.argument<String>("alias") as? String)
 
         if (aliasId == null || aliasId.isBlank()) {
-            result.error("VWO", "aliasId parameter is required and cannot be null or empty.", null)
+            result.error("VWO", "alias parameter is required and cannot be null or empty.", null)
             return
         }
 
-        VWO.setAlias(userContext, aliasId)
-        result.success(true)
-    }
-
-    /**
-     *
-     * Sets an alias for a user (links temporary user ID to original user ID).
-     *
-     * @param call The method call containing userContext, alias, accountId, and sdkKey
-     * @param result The result callback
-     */
-    fun setAlias(call: MethodCall, result: Result) {
-        val args = call.arguments as? Map<*, *>
-        val userContextMap = args?.get("userContext") as? Map<String, Any>
-        val alias = args?.get("alias") as? String
-
-        if (userContextMap == null || alias.isNullOrBlank()) {
+        if (contextMap == null || aliasId.isNullOrBlank()) {
             result.error(
                 "INVALID_ARGUMENTS",
                 "userContext and alias are required",
@@ -638,6 +608,7 @@ class VWOBridge(private val context: Context) {
         }
 
         // Extract accountId and sdkKey for multi-instance support (optional)
+        val args = call.arguments as? Map<*, *>
         val accountId = args?.get("accountId") as? Int
         val sdkKey = args?.get("sdkKey") as? String
 
@@ -646,25 +617,20 @@ class VWOBridge(private val context: Context) {
         try {
             // Convert contextMap to VWOUserContext object
             val context = VWOUserContext().apply {
-                id = userContextMap["id"] as? String
-                customVariables =
-                    userContextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
-                variationTargetingVariables =
-                    userContextMap["variationTargetingVariables"] as? MutableMap<String, Any>
-                        ?: mutableMapOf()
+                id = contextMap["id"] as? String
+                shouldUseDeviceIdAsUserId =
+                    (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
             }
 
             if(vwoInstance == null) {
-                result.error(
-                    "SET_ALIAS_ERROR",
-                    "Could not get instance of VWO SDK.",
-                    e.stackTraceToString()
-                )
+                val message = "SDK is not initialized, please try again later."
+                result.error("SET_ALIAS_ERROR", message, null)
+                Log.e("VWO", message)
                 return
             }
 
             // Use the provided instance or fallback to default instance
-            vwoInstance.setAlias(context, alias)
+            vwoInstance.setAlias(context, aliasId)
             result.success(true)
         } catch (e: Exception) {
             result.error(
