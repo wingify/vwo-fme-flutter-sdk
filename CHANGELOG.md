@@ -5,14 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.2] - 2025-10-24
+## [1.8.3] - 2026-02-16
 
 ### Added
 
+- Multi-instance / multi-account for different credentials within a single application
+- When invalid credentials entered, do not retry API calls
 - Support to use Device ID if `context.id` is not available
 - Support to set user Aliasing
 
-## [1.8.3] - 2025-12-19
+## [1.8.2] - 2025-12-19
 
 ### Fixed
 - Fixed a bug validating settings when json type variable contains array of objects
