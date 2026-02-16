@@ -86,22 +86,16 @@ class VWO {
   ///
   /// [featureKey] The name of the feature flag.
   /// [context] The user context for evaluating the flag.
-  /// [accountId] Optional account ID for multi-instance support. If not provided, uses the instance's accountId.
-  /// [sdkKey] Optional SDK key for multi-instance support. If not provided, uses the instance's sdkKey.
   ///
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
-  Future<GetFlag?> getFlag({
-    required String featureKey,
-    required VWOUserContext context,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<GetFlag?> getFlag(
+      {required String featureKey, required VWOUserContext context}) async {
     try {
       return _fmePlugin?.getFlag(
         featureKey: featureKey,
         userContext: context,
-        accountId: accountId ?? _accountId,
-        sdkKey: sdkKey ?? _sdkKey,
+        accountId: _accountId,
+        sdkKey: _sdkKey,
       );
     } catch (e) {
       String details;
@@ -120,24 +114,19 @@ class VWO {
   /// [eventName] The name of the event.
   /// [context] The VWO context for the event.
   /// [eventProperties] Optional properties associated with the event.
-  /// [accountId] Optional account ID for multi-instance support. If not provided, uses the instance's accountId.
-  /// [sdkKey] Optional SDK key for multi-instance support. If not provided, uses the instance's sdkKey.
   ///
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
-  Future<Map<String, bool>?> trackEvent({
-    required String eventName,
-    required VWOUserContext context,
-    Map<String, dynamic>? eventProperties,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<Map<String, bool>?> trackEvent(
+      {required String eventName,
+      required VWOUserContext context,
+      Map<String, dynamic>? eventProperties}) async {
     try {
       return _fmePlugin?.trackEvent(
         eventName: eventName,
         userContext: context,
         eventProperties: eventProperties,
-        accountId: accountId ?? _accountId,
-        sdkKey: sdkKey ?? _sdkKey,
+        accountId: _accountId,
+        sdkKey: _sdkKey,
       );
     } catch (e) {
       String details;
@@ -155,16 +144,11 @@ class VWO {
   ///
   /// [attributes] The map of attributes to set.
   /// [context] The user context for the attribute.
-  /// [accountId] Optional account ID for multi-instance support. If not provided, uses the instance's accountId.
-  /// [sdkKey] Optional SDK key for multi-instance support. If not provided, uses the instance's sdkKey.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
-  Future<bool>? setAttribute({
-    required Map<String, dynamic> attributes,
-    required VWOUserContext context,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<bool>? setAttribute(
+      {required Map<String, dynamic> attributes,
+      required VWOUserContext context}) async {
     try {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
@@ -172,8 +156,8 @@ class VWO {
       return plugin.setAttribute(
         attributes: attributes,
         userContext: context,
-        accountId: accountId ?? _accountId,
-        sdkKey: sdkKey ?? _sdkKey,
+        accountId: _accountId,
+        sdkKey: _sdkKey,
       );
     } catch (e) {
       String details;
@@ -200,13 +184,8 @@ class VWO {
   ///
   /// Returns `true` if the alias was set successfully, `false` if there was an error
   /// or if the plugin is not available. Returns `null` if the method cannot be executed.
-  Future<bool>? setAlias({
-    required VWOUserContext context,
-    required String alias,
-    int? accountId,
-    String? sdkKey,
-  }) async {
-
+  Future<bool>? setAlias(
+      {required VWOUserContext context, required String alias}) async {
     try {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
@@ -214,8 +193,8 @@ class VWO {
       return plugin.setAlias(
         userContext: context,
         alias: alias,
-        accountId: accountId ?? _accountId,
-        sdkKey: sdkKey ?? _sdkKey,
+        accountId: _accountId,
+        sdkKey: _sdkKey,
       );
     } catch (e) {
       String details;
@@ -263,5 +242,4 @@ class VWO {
       print(message);
     }
   }
-
 }
