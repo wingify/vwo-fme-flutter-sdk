@@ -214,15 +214,11 @@ class VWO {
   /// [sdkKey] The SDK key of the instance to clear.
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of clearing the instance.
-  static Future<bool> clearInstance({
-    required int accountId,
-    required String sdkKey,
-  }) async {
+  Future<bool> clearInstance() async {
     try {
-      final plugin = VwoFmeFlutterSdkPlatform.instance;
-      return await plugin.clearInstance(
-        accountId: accountId,
-        sdkKey: sdkKey,
+      return await _fmePlugin!.clearInstance(
+        accountId: _accountId!,
+        sdkKey: _sdkKey!,
       );
     } catch (e) {
       String details;
