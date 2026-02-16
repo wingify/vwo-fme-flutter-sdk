@@ -248,7 +248,8 @@ class VWOBridge(private val context: Context) {
                     userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap()
                 )
 
-                shouldUseDeviceIdAsUserId = userContextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
+                shouldUseDeviceIdAsUserId =
+                    userContextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Handle gatewayService if present
@@ -280,9 +281,8 @@ class VWOBridge(private val context: Context) {
         result: Result
     ) {
         try {
-            // Use the provided instance or fallback to default instance
-            val instance = vwoInstance
-            if (instance == null) {
+
+            if (vwoInstance == null) {
                 result.error(
                     "UNEXPECTED_ERROR",
                     "Could not get VWO instance, please ensure VWO is initialized properly.",
@@ -291,7 +291,7 @@ class VWOBridge(private val context: Context) {
                 return
             }
 
-            instance?.getFlag(flagName, userContext, object : IVwoListener {
+            vwoInstance.getFlag(flagName, userContext, object : IVwoListener {
                 override fun onSuccess(data: Any) {
                     val featureFlag = data as? GetFlag
                     val response = if (featureFlag != null) {
@@ -370,13 +370,11 @@ class VWOBridge(private val context: Context) {
                     contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
                         ?: mutableMapOf()
 
-                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
+                shouldUseDeviceIdAsUserId =
+                    contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
-            // Use the provided instance or fallback to default instance
-            val instance = vwoInstance
-
-            if (instance == null) {
+            if (vwoInstance == null) {
                 result.error(
                     "UNEXPECTED_ERROR",
                     "Could not get VWO instance, please ensure VWO is initialized properly.",
@@ -387,9 +385,9 @@ class VWOBridge(private val context: Context) {
 
             // Call the appropriate `trackEvent` method based on the presence of eventProperties
             val trackingResult = if (eventProperties == null) {
-                instance?.trackEvent(eventName, context)
+                vwoInstance.trackEvent(eventName, context)
             } else {
-                instance?.trackEvent(eventName, context, eventProperties)
+                vwoInstance.trackEvent(eventName, context, eventProperties)
             }
 
             if (trackingResult != null) {
@@ -457,13 +455,11 @@ class VWOBridge(private val context: Context) {
                 variationTargetingVariables =
                     contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
                         ?: mutableMapOf()
-                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
+                shouldUseDeviceIdAsUserId =
+                    contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
-            // Use the provided instance or fallback to default instance
-            val instance = vwoInstance
-
-            if (instance == null) {
+            if (vwoInstance == null) {
                 result.error(
                     "UNEXPECTED_ERROR",
                     "Could not get VWO instance, please ensure VWO is initialized properly.",
@@ -472,7 +468,7 @@ class VWOBridge(private val context: Context) {
                 return
             }
 
-            instance?.setAttribute(attributes, context)
+            vwoInstance.setAttribute(attributes, context)
             result.success(true) // Return success to Flutter
         } catch (e: Exception) {
             result.error(
@@ -645,7 +641,6 @@ class VWOBridge(private val context: Context) {
         val accountId = args?.get("accountId") as? Int
         val sdkKey = args?.get("sdkKey") as? String
 
-        // Get the appropriate instance or use default
         val vwoInstance = getVWOInstance(accountId, sdkKey)
 
         try {
@@ -659,9 +654,17 @@ class VWOBridge(private val context: Context) {
                         ?: mutableMapOf()
             }
 
+            if(vwoInstance == null) {
+                result.error(
+                    "SET_ALIAS_ERROR",
+                    "Could not get instance of VWO SDK.",
+                    e.stackTraceToString()
+                )
+                return
+            }
+
             // Use the provided instance or fallback to default instance
-            val instance = vwoInstance ?: VWO.getInstance(accountId, sdkKey)
-            instance?.setAlias(context, alias)
+            vwoInstance.setAlias(context, alias)
             result.success(true)
         } catch (e: Exception) {
             result.error(
@@ -676,7 +679,7 @@ class VWOBridge(private val context: Context) {
      * Clears a specific VWO instance.
      *
      * @param call The method call containing accountId and sdkKey
-     * @param result The result callback
+     * @param result The result callback, if account id or sdkKey is missing will return error, else success
      */
     fun clearInstance(call: MethodCall, result: Result) {
         val args = call.arguments as? Map<*, *>
