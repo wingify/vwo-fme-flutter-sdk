@@ -73,6 +73,9 @@ class VwoFmeFlutterSdkPlugin : FlutterPlugin, MethodCallHandler {
             VWOConstants.ANDROID_SEND_SDK_INIT_EVENT -> {
                 bridge?.sendSdkInitEvent(call, result)
             }
+            VWOConstants.ANDROID_SET_ALIAS -> {
+                bridge?.setAlias(call, result)
+            }
             else -> {
                 result.notImplemented()
             }

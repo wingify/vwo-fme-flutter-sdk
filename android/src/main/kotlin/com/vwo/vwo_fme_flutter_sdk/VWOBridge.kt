@@ -240,12 +240,15 @@ class VWOBridge(private val context: Context) {
             // Create VWOUserContext from userContextMap
             val userContext = VWOUserContext().apply {
                 id = userContextMap["id"] as? String
+
                 customVariables.putAll(
                     userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap()
                 )
                 variationTargetingVariables.putAll(
                     userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap()
                 )
+
+                shouldUseDeviceIdAsUserId = userContextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Handle gatewayService if present
@@ -287,7 +290,7 @@ class VWOBridge(private val context: Context) {
                 )
                 return
             }
-            
+
             instance?.getFlag(flagName, userContext, object : IVwoListener {
                 override fun onSuccess(data: Any) {
                     val featureFlag = data as? GetFlag
@@ -360,11 +363,14 @@ class VWOBridge(private val context: Context) {
             // Convert the incoming context map to a VWOUserContext object
             val context = VWOUserContext().apply {
                 id = contextMap["id"] as? String
+
                 customVariables =
                     contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
                 variationTargetingVariables =
                     contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
                         ?: mutableMapOf()
+
+                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Use the provided instance or fallback to default instance
@@ -451,6 +457,7 @@ class VWOBridge(private val context: Context) {
                 variationTargetingVariables =
                     contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
                         ?: mutableMapOf()
+                shouldUseDeviceIdAsUserId = contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
             }
 
             // Use the provided instance or fallback to default instance
@@ -549,6 +556,7 @@ class VWOBridge(private val context: Context) {
             }
 
             val sdkInitTimeStr = call.argument<String>("sdkInitTime")
+
             if (sdkInitTimeStr == null) {
                 result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
                 return
@@ -574,6 +582,46 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
+     * Sets an alias for the current user in VWO.
+     * This method allows you to associate an alias ID with a user context for tracking purposes.
+     *
+     * @param call MethodCall containing the following arguments:
+     *   - "aliasId": String - The alias identifier to set for the user (required, cannot be null or empty)
+     *   - "context": Map<String, Any> - User context containing:
+     *     - "id": String - User identifier
+     *     - "shouldUseDeviceIdAsUserId": Boolean - Whether to use device ID as user ID (optional, defaults to false)
+     * @param result Result object to return success/error status to Flutter
+     */
+    fun setAlias(call: MethodCall, result: Result) {
+
+        if (vwo == null) {
+
+            val message = "SDK is not initialized, please try again later."
+            result.error("SET_ALIAS_ERROR", message, null)
+            Log.e("VWO", message)
+            return
+        }
+
+        val contextMap = call.argument<Map<String, Any>>("context")
+        val aliasId = (call.argument<String>("aliasId") as? String)
+
+        val userContext = VWOUserContext().apply {
+            id = (contextMap?.get("id") as? String)
+            shouldUseDeviceIdAsUserId =
+                (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
+        }
+
+        if (aliasId == null || aliasId.isBlank()) {
+            result.error("VWO", "aliasId parameter is required and cannot be null or empty.", null)
+            return
+        }
+
+        VWO.setAlias(userContext, aliasId)
+        result.success(true)
+    }
+
+    /**
+     *
      * Sets an alias for a user (links temporary user ID to original user ID).
      *
      * @param call The method call containing userContext, alias, accountId, and sdkKey

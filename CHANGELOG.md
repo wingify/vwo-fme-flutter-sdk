@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.2] - 2025-12-19
+## [1.8.2] - 2025-10-24
+
+### Added
+
+- Support to use Device ID if `context.id` is not available
+- Support to set user Aliasing
+
+## [1.8.3] - 2025-12-19
 
 ### Fixed
 - Fixed a bug validating settings when json type variable contains array of objects
@@ -14,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.8.1] - 2025-10-01
 
 ### Fixed
+
 - Bugfix for user count not increasing on dashboard
 
 ## [1.8.0] - 2025-09-03
@@ -38,7 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added support for sending a one-time SDK initialization event to VWO server as part of health-check milestones.
+- Added support for sending a one-time SDK initialization event to VWO server as part of
+  health-check milestones.
 
 ## [1.6.4] - 2025-07-25
 
@@ -72,11 +81,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.0] - 2025-03-12
 
 ### Added
-- Support for storing impression events while the device is offline, ensuring no data loss. These events are batched and seamlessly synchronized with VWO servers once the device reconnects to the internet.
-- Online event batching allows synchronization of impression events while the device is online. This feature can be configured by setting either the minimum batch size or the batch upload time interval during SDK initialization.
+
+- Support for storing impression events while the device is offline, ensuring no data loss. These
+  events are batched and seamlessly synchronized with VWO servers once the device reconnects to the
+  internet.
+- Online event batching allows synchronization of impression events while the device is online. This
+  feature can be configured by setting either the minimum batch size or the batch upload time
+  interval during SDK initialization.
 - Support for sending multiple attributes at once.
 - Support to use external logger provided in dart code
-- Support for configuring SDK when linking with VWO Mobile Insights SDK. This can be configured by setting session data received via callback from Mobile Insights SDK
+- Support for configuring SDK when linking with VWO Mobile Insights SDK. This can be configured by
+  setting session data received via callback from Mobile Insights SDK
 
 ## [1.1.0] - 2024-12-23
 
