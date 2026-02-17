@@ -30,7 +30,6 @@ private let IOS_SET_ALIAS = "setAlias"
 private let IOS_CLEAR_INSTANCE = "clearInstance"
 private let IOS_SET_SESSION = "setSessionData"
 private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
-private let IOS_SET_ALIAS = "setAlias"
 
 /// The VWO FME Flutter SDK plugin for iOS.
 ///
@@ -108,9 +107,6 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             setSessionData(call, result: result)
         case IOS_SEND_SDK_INIT_EVENT:
             sendSdkInitEvent(call, result: result)
-
-        case IOS_SET_ALIAS:
-            setAlias(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -189,22 +185,6 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
             }
         }
-    }
-
-    private func setAlias(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let aliasId = args["aliasId"] as? String,
-              let context = args["context"] as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGUMENTS", message: "aliasId and context are required", details: nil))
-            return
-        }
-        let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
-        let userContext = VWOUserContext(id: context["id"] as? String,
-                                         shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId, customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        VWOFme.setAlias(from: userContext, to: aliasId)
-        let response: [String: Bool] = ["success": true]
-        result(response)
-
     }
 
     /// Executes the integration callback with the given properties.
