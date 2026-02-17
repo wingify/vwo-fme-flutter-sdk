@@ -32,6 +32,13 @@ class VWO {
   int? _accountId;
   String? _sdkKey;
 
+  /// Map of initialized VWO instances keyed by "accountId_sdkKey".
+  static final Map<String, VWO> _instances = {};
+
+  /// Generates a unique key from accountId and sdkKey.
+  static String _instanceKey(int accountId, String sdkKey) =>
+      '${accountId}_$sdkKey';
+
   /// Initializes the VWO SDK.
   ///
   /// This method should be called before any other VWO methods.
@@ -46,6 +53,7 @@ class VWO {
       fmeSdk._fmePlugin = sdkPlugin;
       fmeSdk._accountId = options.accountId;
       fmeSdk._sdkKey = options.sdkKey;
+      _instances[_instanceKey(options.accountId, options.sdkKey)] = fmeSdk;
       return fmeSdk;
     } catch (e) {
       if (e is PlatformException) {
@@ -71,11 +79,8 @@ class VWO {
     required String sdkKey,
   }) {
     try {
-      var fmeSdk = VWO();
-      fmeSdk._fmePlugin = VwoFmeFlutterSdkPlatform.instance;
-      fmeSdk._accountId = accountId;
-      fmeSdk._sdkKey = sdkKey;
-      return fmeSdk;
+      final key = _instanceKey(accountId, sdkKey);
+      return _instances[key];
     } catch (e) {
       logMessage("VWO: Error getting instance: $e");
       return null;
@@ -216,10 +221,14 @@ class VWO {
   /// Returns a [Future] that resolves to a boolean indicating the success status of clearing the instance.
   Future<bool> clearInstance() async {
     try {
-      return await _fmePlugin!.clearInstance(
+      final result = await _fmePlugin!.clearInstance(
         accountId: _accountId!,
         sdkKey: _sdkKey!,
       );
+      if (result) {
+        _instances.remove(_instanceKey(_accountId!, _sdkKey!));
+      }
+      return result;
     } catch (e) {
       String details;
       if (e is PlatformException) {
