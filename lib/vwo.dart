@@ -221,10 +221,7 @@ class VWO {
   /// Returns a [Future] that resolves to a boolean indicating the success status of clearing the instance.
   Future<bool> clearInstance() async {
     try {
-      final result = await _fmePlugin!.clearInstance(
-        accountId: _accountId!,
-        sdkKey: _sdkKey!,
-      );
+      final result = await _fmePlugin!.clearInstance();
       if (result) {
         _instances.remove(_instanceKey(_accountId!, _sdkKey!));
       }

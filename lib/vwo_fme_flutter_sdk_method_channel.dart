@@ -33,6 +33,9 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
   List<Map<String, dynamic>>? _transports;
 
+  int? accountId;
+  String? sdkKey;
+
   /// Initializes the VWO FME Flutter SDK.
   ///
   /// This method is the entry point for setting up and configuring the VWO FME
@@ -84,6 +87,10 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     };
 
     var flutterSdk = MethodChannelVwoFmeFlutterSdk();
+
+    flutterSdk.accountId = options.accountId;
+    flutterSdk.sdkKey = options.sdkKey;
+
     // Set the integration callback handler if provided
     flutterSdk._setBridgeCallbackHandler(options);
     flutterSdk._transports = transportsCopy;
@@ -197,8 +204,6 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   Future<GetFlag> getFlag({
     required String featureKey,
     required VWOUserContext userContext,
-    int? accountId,
-    String? sdkKey,
   }) async {
     try {
       final Map<String, dynamic> arguments = {
@@ -241,13 +246,10 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   ///
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   @override
-  Future<Map<String, bool>> trackEvent({
-    required String eventName,
-    required VWOUserContext userContext,
-    Map<String, dynamic>? eventProperties,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<Map<String, bool>> trackEvent(
+      {required String eventName,
+      required VWOUserContext userContext,
+      Map<String, dynamic>? eventProperties}) async {
     try {
       final Map<String, dynamic> arguments = {
         'eventName': eventName,
@@ -284,12 +286,9 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   @override
-  Future<bool> setAttribute({
-    required Map<String, dynamic> attributes,
-    required VWOUserContext userContext,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<bool> setAttribute(
+      {required Map<String, dynamic> attributes,
+      required VWOUserContext userContext}) async {
     try {
       final Map<String, dynamic> arguments = {
         'attributes': attributes,
@@ -311,12 +310,8 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   }
 
   @override
-  Future<bool> setAlias({
-    required VWOUserContext userContext,
-    required String alias,
-    int? accountId,
-    String? sdkKey,
-  }) async {
+  Future<bool> setAlias(
+      {required VWOUserContext userContext, required String alias}) async {
     try {
       final Map<String, dynamic> arguments = {
         'userContext': userContext.toMap(),
@@ -338,10 +333,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   }
 
   @override
-  Future<bool> clearInstance({
-    required int accountId,
-    required String sdkKey,
-  }) async {
+  Future<bool> clearInstance() async {
     try {
       final result = await methodChannel.invokeMethod<bool>(
         'clearInstance',
