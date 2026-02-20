@@ -96,12 +96,7 @@ class VWO {
   Future<GetFlag?> getFlag(
       {required String featureKey, required VWOUserContext context}) async {
     try {
-      return _fmePlugin?.getFlag(
-        featureKey: featureKey,
-        userContext: context,
-        accountId: _accountId,
-        sdkKey: _sdkKey,
-      );
+      return _fmePlugin?.getFlag(featureKey: featureKey, userContext: context);
     } catch (e) {
       String details;
       if (e is PlatformException) {
@@ -127,12 +122,9 @@ class VWO {
       Map<String, dynamic>? eventProperties}) async {
     try {
       return _fmePlugin?.trackEvent(
-        eventName: eventName,
-        userContext: context,
-        eventProperties: eventProperties,
-        accountId: _accountId,
-        sdkKey: _sdkKey,
-      );
+          eventName: eventName,
+          userContext: context,
+          eventProperties: eventProperties);
     } catch (e) {
       String details;
       if (e is PlatformException) {
@@ -158,12 +150,7 @@ class VWO {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
-      return plugin.setAttribute(
-        attributes: attributes,
-        userContext: context,
-        accountId: _accountId,
-        sdkKey: _sdkKey,
-      );
+      return plugin.setAttribute(attributes: attributes, userContext: context);
     } catch (e) {
       String details;
       if (e is PlatformException) {
@@ -195,12 +182,7 @@ class VWO {
       final plugin = _fmePlugin;
       if (plugin == null) return false;
 
-      return plugin.setAlias(
-        userContext: context,
-        alias: alias,
-        accountId: _accountId,
-        sdkKey: _sdkKey,
-      );
+      return plugin.setAlias(userContext: context, alias: alias);
     } catch (e) {
       String details;
       if (e is PlatformException) {
