@@ -413,10 +413,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
             // Use instance method
             instance.sendSdkInitEvent(sdkInitTime: sdkInitTime)
-        } else {
-            // Fallback to static method (default instance)
-            VWOFme.sendSdkInitEvent(sdkInitTime: sdkInitTime)
-        }
+        } 
 
         result(true)
     }
