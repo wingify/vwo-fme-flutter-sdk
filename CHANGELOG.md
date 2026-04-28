@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When invalid credentials entered, do not retry API calls
 - Support to use Device ID if `context.id` is not available
 - Support to set user Aliasing
+- Introduced holdout group support for feature flags and events, including holdout settings in the configuration, SDK-side holdout evaluation, and exclusion of users in holdout groups from feature rollouts and experiments.
 
 ## [1.8.2] - 2025-12-19
 
