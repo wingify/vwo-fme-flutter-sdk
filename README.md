@@ -285,6 +285,7 @@ final vwoClient = await VWO.init(vwoInitOptions);
 
 ## Authors
 
+* [Nabin Niroula](https://github.com/xyznaveen)
 * [Swapnil Chaudhari](https://github.com/swapnilWingify)
 
 ### Version History

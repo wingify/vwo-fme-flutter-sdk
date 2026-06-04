@@ -50,5 +50,6 @@ android {
 }
 
 dependencies {
-    api 'com.vwo.sdk:vwo-fme-android-sdk:1.13.1'
+    // Single artifact ships both com.vwo.* (legacy) and com.wingify.* APIs.
+    api 'com.wingify.sdk:wingify-fme-android-sdk:1.50.+'
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright (c) 2024-2026 Wingify Software Pvt. Ltd.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,14 +14,13 @@
  *  limitations under the License.
  *
  */
-import 'package:vwo_fme_flutter_sdk/utils/sdk_info.dart';
-
-import '../vwo/models/vwo_init_options.dart';
+import '../internal/fme_init_options.dart';
+import 'sdk_info.dart';
 
 class UsageStats {
   static const String _keyLanguageVersion = "lv";
 
-  final VWOInitOptions initOptions;
+  final FmeInitOptions initOptions;
   final Map<String, String> _stats = {};
 
   UsageStats(this.initOptions);
@@ -33,8 +32,8 @@ class UsageStats {
   Future<Map<String, dynamic>> getStats() async{
     if (!initOptions.isUsageStatsDisabled) {
       await _collectStats();
-      initOptions.vwo_meta.addAll(_stats);
-      return initOptions.vwo_meta;
+      initOptions.platformMeta.addAll(_stats);
+      return initOptions.platformMeta;
     }
     return Future.value({});
   }

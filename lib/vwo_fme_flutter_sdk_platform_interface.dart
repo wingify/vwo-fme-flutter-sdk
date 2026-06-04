@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2026 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
 
-import 'vwo/models/vwo_user_context.dart';
+import 'internal/fme_user_context.dart';
+import 'wingify/models/get_flag.dart';
 import 'vwo_fme_flutter_sdk_method_channel.dart';
 
 abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
@@ -48,7 +48,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
   Future<GetFlag?> getFlag({
     required String featureKey,
-    required VWOUserContext userContext,
+    required FmeUserContext userContext,
   }) {
     throw UnimplementedError('getFlag() has not been implemented.');
   }
@@ -62,7 +62,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
   Future<Map<String, bool>> trackEvent({
     required String eventName,
-    required VWOUserContext userContext,
+    required FmeUserContext userContext,
     Map<String, dynamic>? eventProperties,
   }) {
     throw UnimplementedError('trackEvent() has not been implemented.');
@@ -76,7 +76,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
   Future<bool> setAttribute(
       {required Map<String, dynamic> attributes,
-      required VWOUserContext userContext}) {
+      required FmeUserContext userContext}) {
     throw UnimplementedError('setAttribute() has not been implemented.');
   }
 
@@ -87,7 +87,7 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
   ///
   /// Returns a [Future] that resolves to a boolean indicating the success status of setting the alias.
   Future<bool> setAlias(
-      {required VWOUserContext userContext, required String alias}) {
+      {required FmeUserContext userContext, required String alias}) {
     throw UnimplementedError('setAlias() has not been implemented.');
   }
 

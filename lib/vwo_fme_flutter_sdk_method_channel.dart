@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2026 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:vwo_fme_flutter_sdk/utils/usage_stats.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
-import 'package:vwo_fme_flutter_sdk/utils/constants.dart';
 
+import 'internal/fme_init_options.dart';
+import 'internal/fme_user_context.dart';
 import 'logger/log_transport.dart';
-import 'vwo/models/vwo_user_context.dart';
+import 'utils/constants.dart';
+import 'utils/usage_stats.dart';
+import 'wingify/models/get_flag.dart';
 import 'vwo_fme_flutter_sdk_platform_interface.dart';
 
 /// An implementation of [VwoFmeFlutterSdkPlatform] that uses method channels.
@@ -35,6 +35,10 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
   int? accountId;
   String? sdkKey;
+
+  /// Whether this instance routes through the Wingify native API. Sent with
+  /// every call so the native bridge uses the correct API and endpoints.
+  bool useWingifyApi = false;
 
   /// Initializes the VWO FME Flutter SDK.
   ///
@@ -52,7 +56,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// [MethodChannelVwoFmeFlutterSdk] if the initialization is successful,
   /// or error if the initialization fails.
   static Future<MethodChannelVwoFmeFlutterSdk?> init(
-      VWOInitOptions options) async {
+      FmeInitOptions options) async {
     // Record the start time for measuring initialization duration
     final initStartTime = DateTime.now().millisecondsSinceEpoch;
 
@@ -83,13 +87,15 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       'sdkVersion': sdkVersion,
       'isUsageStatsDisabled': options.isUsageStatsDisabled,
       'isAliasingEnabled': options.isAliasingEnabled,
-      'hasIntegrations': options.integrations != null
+      'hasIntegrations': options.integrations != null,
+      'useWingifyApi': options.useWingifyApi
     };
 
     var flutterSdk = MethodChannelVwoFmeFlutterSdk();
 
     flutterSdk.accountId = options.accountId;
     flutterSdk.sdkKey = options.sdkKey;
+    flutterSdk.useWingifyApi = options.useWingifyApi;
 
     // Set the integration callback handler if provided
     flutterSdk._setBridgeCallbackHandler(options);
@@ -105,7 +111,9 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     try {
       await flutterSdk.sendSdkInitEvent(
           sdkInitTime, options.accountId, options.sdkKey);
-    } catch (e) {}
+    } catch (e) {
+      // Best-effort telemetry; init must not fail if this event can't be sent.
+    }
 
     return flutterSdk;
   }
@@ -125,7 +133,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// key-value pair, where the key is a string (the transport name) and the
   /// value is a [LogTransport] object.
   static List<Map<String, dynamic>> _prepareLoggersForBridge(
-      VWOInitOptions options) {
+      FmeInitOptions options) {
     List<Map<String, dynamic>> transportsCopy = <Map<String, dynamic>>[];
     if (options.logger?.containsKey("transports") == true) {
       // Extract the transports list from the logger
@@ -156,7 +164,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   ///
   /// [options] The initialization options for the VWO SDK.
   /// [properties] The properties map received from the native side.
-  void _setBridgeCallbackHandler(VWOInitOptions options) {
+  void _setBridgeCallbackHandler(FmeInitOptions options) {
     methodChannel.setMethodCallHandler((call) async {
       final Map<String, dynamic> properties =
           Map<String, dynamic>.from(call.arguments);
@@ -203,12 +211,13 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   @override
   Future<GetFlag> getFlag({
     required String featureKey,
-    required VWOUserContext userContext,
+    required FmeUserContext userContext,
   }) async {
     try {
       final Map<String, dynamic> arguments = {
         'flagName': featureKey,
         'userContext': userContext.toMap(),
+        'useWingifyApi': useWingifyApi,
       };
       if (accountId != null) {
         arguments['accountId'] = accountId;
@@ -248,12 +257,13 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   @override
   Future<Map<String, bool>> trackEvent(
       {required String eventName,
-      required VWOUserContext userContext,
+      required FmeUserContext userContext,
       Map<String, dynamic>? eventProperties}) async {
     try {
       final Map<String, dynamic> arguments = {
         'eventName': eventName,
         'context': userContext.toMap(),
+        'useWingifyApi': useWingifyApi,
       };
       if (eventProperties != null) {
         arguments['eventProperties'] = eventProperties;
@@ -288,11 +298,12 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   @override
   Future<bool> setAttribute(
       {required Map<String, dynamic> attributes,
-      required VWOUserContext userContext}) async {
+      required FmeUserContext userContext}) async {
     try {
       final Map<String, dynamic> arguments = {
         'attributes': attributes,
         'context': userContext.toMap(),
+        'useWingifyApi': useWingifyApi,
       };
       if (accountId != null) {
         arguments['accountId'] = accountId;
@@ -311,11 +322,12 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
   @override
   Future<bool> setAlias(
-      {required VWOUserContext userContext, required String alias}) async {
+      {required FmeUserContext userContext, required String alias}) async {
     try {
       final Map<String, dynamic> arguments = {
         'userContext': userContext.toMap(),
         'alias': alias,
+        'useWingifyApi': useWingifyApi,
       };
       if (accountId != null) {
         arguments['accountId'] = accountId;
@@ -340,6 +352,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
         {
           'accountId': accountId,
           'sdkKey': sdkKey,
+          'useWingifyApi': useWingifyApi,
         },
       );
       return result ?? false;
@@ -375,6 +388,7 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
           'sdkInitTime': sdkInitTime.toString(),
           'accountId': accountId,
           'sdkKey': sdkKey,
+          'useWingifyApi': useWingifyApi,
         }, // Send as String for proper type conversion
       );
       return result ?? false;

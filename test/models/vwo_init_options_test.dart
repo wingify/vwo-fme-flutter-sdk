@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use_from_same_package
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
 
@@ -69,6 +70,18 @@ void main() {
 
       // Assert
       expect(options.vwo_meta['test'], equals('value'));
+    });
+
+    test('should allow reassignment of vwo_meta', () {
+      final options = VWOInitOptions(
+        sdkKey: 'test-sdk-key',
+        accountId: 12345,
+      );
+
+      options.vwo_meta = {'replaced': true};
+
+      expect(options.vwo_meta, equals({'replaced': true}));
+      expect(options.platformMeta, equals({'replaced': true}));
     });
 
     test('should generate correct toString representation', () {

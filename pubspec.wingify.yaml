@@ -1,0 +1,37 @@
+name: wingify_fme_flutter_sdk
+description: Wingify FME is a solution where you integrate Wingify's SDK in your app codebase and can run feature tests, rollouts, personalization and experimentation campaigns.
+#Update version in lib/utils/constants.dart as well.
+#1.0.0: This is the version name (Major.Minor.Patch).
+version: 1.50.0
+homepage: https://wingify.com
+publish_to: none
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+  flutter: ">=2.5.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  mockito: ^5.3.2
+  build_runner: ^2.3.3
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+flutter:
+  # The native plugin (Android package, iOS pod, method channel) is shared with
+  # vwo_fme_flutter_sdk and intentionally keeps the same identifiers.
+  plugin:
+    platforms:
+      android:
+        package: com.vwo.vwo_fme_flutter_sdk
+        pluginClass: VwoFmeFlutterSdkPlugin
+      ios:
+        pluginClass: VwoFmeFlutterSdkPlugin

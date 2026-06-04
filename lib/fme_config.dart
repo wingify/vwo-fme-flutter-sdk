@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
-import 'package:vwo_fme_flutter_sdk/vwo.dart';
+
+import 'internal/fme_client.dart';
 
 class FmeConfig {
 
@@ -20,7 +21,7 @@ class FmeConfig {
       } else {
         details = e.toString();
       }
-      VWO.logMessage('VWO: Failed to set session data $details');
+      FmeClient.logMessage('FME: Failed to set session data $details');
       return false;
     }
   }

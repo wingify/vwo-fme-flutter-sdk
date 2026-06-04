@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use_from_same_package
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vwo_fme_flutter_sdk/vwo.dart';
@@ -271,6 +272,57 @@ void main() {
           ),
           throwsA(isA<Exception>()),
         );
+      });
+    });
+
+    group('setAlias()', () {
+      late VWO vwo;
+
+      setUp(() async {
+        channel.setMockMethodCallHandler((call) async {
+          if (call.method == 'init') return null;
+          if (call.method == 'setAlias') return true;
+          return null;
+        });
+        vwo = (await VWO.init(testOptions))!;
+      });
+
+      test('should set alias successfully', () async {
+        final result = await vwo.setAlias(
+          context: testUserContext,
+          alias: 'authenticated-user',
+        );
+
+        expect(result, isTrue);
+      });
+
+      test('should return false when platform is null', () async {
+        final vwoWithNullPlatform = VWO();
+
+        final result = await vwoWithNullPlatform.setAlias(
+          context: testUserContext,
+          alias: 'authenticated-user',
+        );
+
+        expect(result, isFalse);
+      });
+
+      test('should return false on PlatformException', () async {
+        channel.setMockMethodCallHandler((call) async {
+          if (call.method == 'init') return null;
+          if (call.method == 'setAlias') {
+            throw PlatformException(code: 'ERROR', message: 'Set alias failed');
+          }
+          return null;
+        });
+        vwo = (await VWO.init(testOptions))!;
+
+        final result = await vwo.setAlias(
+          context: testUserContext,
+          alias: 'authenticated-user',
+        );
+
+        expect(result, isFalse);
       });
     });
 

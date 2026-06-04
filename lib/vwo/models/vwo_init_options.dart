@@ -1,4 +1,4 @@
-/// Copyright 2024-2025 Wingify Software Pvt. Ltd.
+/// Copyright 2024-2026 Wingify Software Pvt. Ltd.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,43 +12,35 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-class VWOInitOptions {
-  final String sdkKey;
-  final int accountId;
-  final Map<String, dynamic>? logger;
-  final Map<String, String>? gatewayService;
-  final int? pollInterval;
-  final int? cachedSettingsExpiryTime;
-  final Function(Map<String, dynamic>)? integrations;
+import '../../wingify/models/wingify_init_options.dart';
 
-  /// Optional: Minimum size of Batch to upload
-  final int batchMinSize;
-
-  /// Optional: Batch upload time interval in milliseconds. Please specify at least few minutes
-  final int batchUploadTimeInterval;
-
-  /// Optional: Usage stats should always be collected, don't collect if [isUsageStatsDisabled] flag is true
-  bool isUsageStatsDisabled = false;
-
-  /// Internal meta data for VWO use.
-  Map<String, dynamic> vwo_meta = {};
-
-  /// Optional: if aliasing is enabled
-  bool? isAliasingEnabled;
-
+/// Deprecated: use [WingifyInitOptions] instead. See MIGRATE.md.
+@Deprecated('Use WingifyInitOptions instead. See MIGRATE.md.')
+class VWOInitOptions extends WingifyInitOptions {
   VWOInitOptions({
-    required this.sdkKey,
-    required this.accountId,
-    this.logger,
-    this.gatewayService,
-    this.pollInterval,
-    this.cachedSettingsExpiryTime,
-    this.integrations,
-    this.batchMinSize = -1,
-    this.batchUploadTimeInterval = -1,
-    this.isUsageStatsDisabled = false,
-    this.isAliasingEnabled = false
+    required super.sdkKey,
+    required super.accountId,
+    super.logger,
+    super.gatewayService,
+    super.pollInterval,
+    super.cachedSettingsExpiryTime,
+    super.integrations,
+    super.batchMinSize = -1,
+    super.batchUploadTimeInterval = -1,
+    super.isUsageStatsDisabled = false,
+    super.isAliasingEnabled = false,
   });
+
+  @override
+  bool get useWingifyApi => false;
+
+  /// Legacy name for [platformMeta]. Supports assignment and in-place mutation
+  /// like the v1.9.0 `vwo_meta` field.
+  @override
+  Map<String, dynamic> get vwo_meta => platformMeta;
+
+  @override
+  set vwo_meta(Map<String, dynamic> value) => platformMeta = value;
 
   @override
   String toString() {
@@ -64,6 +56,6 @@ class VWOInitOptions {
         'batchUploadTimeInterval: $batchUploadTimeInterval, '
         'isUsageStatsDisabled: $isUsageStatsDisabled, '
         'isAliasingEnabled: $isAliasingEnabled, '
-        'vwo_meta: $vwo_meta)';
+        'vwo_meta: $platformMeta)';
   }
 }

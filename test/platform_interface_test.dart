@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use_from_same_package
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vwo_fme_flutter_sdk/vwo_fme_flutter_sdk_platform_interface.dart';
 import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_user_context.dart';

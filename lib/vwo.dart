@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2026 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,216 +14,51 @@
  * limitations under the License.
  */
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_init_options.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/get_flag.dart';
-import 'package:vwo_fme_flutter_sdk/vwo/models/vwo_user_context.dart';
-import 'package:vwo_fme_flutter_sdk/vwo_fme_flutter_sdk_method_channel.dart';
 
-import 'vwo_fme_flutter_sdk_platform_interface.dart';
+import 'internal/fme_client.dart';
+import 'vwo/models/vwo_init_options.dart';
+import 'vwo/models/vwo_user_context.dart';
 
-/// The main class for interacting with the VWO Flutter SDK.
+/// The legacy entry point for the VWO FME Flutter SDK.
 ///
-/// This class provides methods for initializing the SDK, getting feature flags,
-/// tracking events, and setting user attributes.
-class VWO {
-  VwoFmeFlutterSdkPlatform? _fmePlugin;
-  int? _accountId;
-  String? _sdkKey;
-
-  /// Map of initialized VWO instances keyed by "accountId_sdkKey".
-  static final Map<String, VWO> _instances = {};
-
-  /// Generates a unique key from accountId and sdkKey.
-  static String _instanceKey(int accountId, String sdkKey) =>
-      '${accountId}_$sdkKey';
+/// Deprecated: use `Wingify` instead. The VWO API continues to work without
+/// changes; see MIGRATE.md for the migration guide.
+@Deprecated('Use Wingify instead. See MIGRATE.md.')
+class VWO extends FmeClient {
+  VWO();
 
   /// Initializes the VWO SDK.
   ///
-  /// This method should be called before any other VWO methods.
-  ///
-  /// [options] The initialization options for the VWO SDK.
-  ///
-  /// Returns a [Future] that resolves to a [VWO] instance if successful, or `null` if an error occurs.
+  /// Returns a [VWO] instance on success, or `null` if an error occurs.
   static Future<VWO?> init(VWOInitOptions options) async {
+    final vwo = VWO();
     try {
-      var sdkPlugin = await MethodChannelVwoFmeFlutterSdk.init(options);
-      var fmeSdk = VWO();
-      fmeSdk._fmePlugin = sdkPlugin;
-      fmeSdk._accountId = options.accountId;
-      fmeSdk._sdkKey = options.sdkKey;
-      _instances[_instanceKey(options.accountId, options.sdkKey)] = fmeSdk;
-      return fmeSdk;
+      await vwo.attach(options);
+      return vwo;
     } catch (e) {
-      if (e is PlatformException) {
-        logMessage("VWO: Error: ${e.message ?? ""}");
-      } else {
-        logMessage("VWO: Error: $e");
-      }
+      logMessage('VWO: Error: ${e is PlatformException ? (e.message ?? '') : e}');
       return null;
     }
   }
 
-  /// Gets an existing VWO instance by accountId and sdkKey.
-  ///
-  /// This method retrieves an instance that was previously initialized.
-  /// The instance must have been initialized using [init] before calling this method.
-  ///
-  /// [accountId] The account ID of the VWO instance.
-  /// [sdkKey] The SDK key of the VWO instance.
-  ///
-  /// Returns a [VWO] instance if found, or `null` if the instance doesn't exist.
-  static VWO? getInstance({
-    required int accountId,
-    required String sdkKey,
-  }) {
-    try {
-      final key = _instanceKey(accountId, sdkKey);
-      return _instances[key];
-    } catch (e) {
-      logMessage("VWO: Error getting instance: $e");
-      return null;
-    }
+  /// Gets an existing VWO instance previously created via [init].
+  static VWO? getInstance({required int accountId, required String sdkKey}) {
+    final client = FmeClient.instances[FmeClient.instanceKey(accountId, sdkKey)];
+    return client is VWO ? client : null;
   }
 
-  /// Gets the value of a feature flag.
+  /// Links a temporary user ID to an authenticated user ID.
   ///
-  /// [featureKey] The name of the feature flag.
-  /// [context] The user context for evaluating the flag.
-  ///
-  /// Returns a [Future] that resolves to a [GetFlag] object containing the flag value and other metadata.
-  Future<GetFlag?> getFlag(
-      {required String featureKey, required VWOUserContext context}) async {
-    try {
-      return _fmePlugin?.getFlag(featureKey: featureKey, userContext: context);
-    } catch (e) {
-      String details;
-      if (e is PlatformException) {
-        details = e.message ?? '';
-      } else {
-        details = e.toString();
-      }
-      logMessage('VWO: Failed to retrieve feature flag $details');
-      return null;
-    }
+  /// Returns `false` if the SDK is not initialized or the call fails.
+  /// Signature matches v1.9.0 ([Future<bool>?]).
+  Future<bool>? setAlias({
+    required VWOUserContext context,
+    required String alias,
+  }) async {
+    return invokeSetAlias(context: context, alias: alias);
   }
 
-  /// Tracks an event.
-  ///
-  /// [eventName] The name of the event.
-  /// [context] The VWO context for the event.
-  /// [eventProperties] Optional properties associated with the event.
-  ///
-  /// Returns a [Future] that resolves to a map indicating the success status of the event tracking.
-  Future<Map<String, bool>?> trackEvent(
-      {required String eventName,
-      required VWOUserContext context,
-      Map<String, dynamic>? eventProperties}) async {
-    try {
-      return _fmePlugin?.trackEvent(
-          eventName: eventName,
-          userContext: context,
-          eventProperties: eventProperties);
-    } catch (e) {
-      String details;
-      if (e is PlatformException) {
-        details = e.message ?? '';
-      } else {
-        details = e.toString();
-      }
-      logMessage('VWO: Failed to track event $details');
-      return null;
-    }
-  }
-
-  /// Sets a user attribute.
-  ///
-  /// [attributes] The map of attributes to set.
-  /// [context] The user context for the attribute.
-  ///
-  /// Returns a [Future] that resolves to a boolean indicating the success status of setting the attribute.
-  Future<bool>? setAttribute(
-      {required Map<String, dynamic> attributes,
-      required VWOUserContext context}) async {
-    try {
-      final plugin = _fmePlugin;
-      if (plugin == null) return false;
-
-      return plugin.setAttribute(attributes: attributes, userContext: context);
-    } catch (e) {
-      String details;
-      if (e is PlatformException) {
-        details = e.message ?? '';
-      } else {
-        details = e.toString();
-      }
-      logMessage('VWO: Failed to set attribute $details');
-      return false;
-    }
-  }
-
-  /// Sets an alias for the current user in VWO.
-  /// This method allows you to associate an alias ID with a user context for tracking purposes.
-  ///
-  /// The method calls the native platform implementation to set the alias and returns
-  /// a boolean indicating success or failure.
-  ///
-  /// [context] The user context containing the temporary user ID.
-  /// [alias] The original/authenticated user ID to link to the temporary ID.
-  /// [accountId] Optional account ID for multi-instance support. If not provided, uses the instance's accountId.
-  /// [sdkKey] Optional SDK key for multi-instance support. If not provided, uses the instance's sdkKey.
-  ///
-  /// Returns `true` if the alias was set successfully, `false` if there was an error
-  /// or if the plugin is not available. Returns `null` if the method cannot be executed.
-  Future<bool>? setAlias(
-      {required VWOUserContext context, required String alias}) async {
-    try {
-      final plugin = _fmePlugin;
-      if (plugin == null) return false;
-
-      return plugin.setAlias(userContext: context, alias: alias);
-    } catch (e) {
-      String details;
-      if (e is PlatformException) {
-        details = e.message ?? '';
-      } else {
-        details = e.toString();
-      }
-      logMessage('VWO: Failed to set alias $details');
-      return false;
-    }
-  }
-
-  /// Clears a specific VWO instance.
-  ///
-  /// [accountId] The account ID of the instance to clear.
-  /// [sdkKey] The SDK key of the instance to clear.
-  ///
-  /// Returns a [Future] that resolves to a boolean indicating the success status of clearing the instance.
-  Future<bool> clearInstance() async {
-    try {
-      final result = await _fmePlugin!.clearInstance();
-      if (result) {
-        _instances.remove(_instanceKey(_accountId!, _sdkKey!));
-      }
-      return result;
-    } catch (e) {
-      String details;
-      if (e is PlatformException) {
-        details = e.message ?? '';
-      } else {
-        details = e.toString();
-      }
-      logMessage('VWO: Failed to clear instance $details');
-      return false;
-    }
-  }
-
-  static void logMessage(String message) {
-    // Only prints in debug
-    if (kDebugMode) {
-      print(message);
-    }
-  }
+  /// Prints a message in debug mode only.
+  static void logMessage(String message) => FmeClient.logMessage(message);
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2026 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,63 +16,83 @@
 package com.vwo.vwo_fme_flutter_sdk
 
 import android.content.Context
-import android.util.Log
 import android.os.Handler
 import android.os.Looper
-import io.flutter.plugin.common.MethodCall
+import android.util.Log
 import com.vwo.VWO
-import com.vwo.models.user.VWOInitOptions
 import com.vwo.interfaces.IVwoInitCallback
-import com.vwo.interfaces.IVwoListener
-import com.vwo.models.user.GetFlag
-import com.vwo.models.user.VWOUserContext
-import com.vwo.models.user.GatewayService
 import com.vwo.interfaces.logger.LogTransport
-import com.vwo.packages.logger.enums.LogLevelEnum
 import com.vwo.models.user.FMEConfig
-import com.vwo.models.Variable
-import com.vwo.interfaces.integration.IntegrationCallback
-import io.flutter.plugin.common.MethodChannel.Result
+import com.vwo.models.user.VWOInitOptions
+import com.vwo.packages.logger.enums.LogLevelEnum
+import com.wingify.Wingify
+import com.wingify.WingifyClient
+import com.wingify.interfaces.IWingifyInitCallback
+import com.wingify.interfaces.integration.IntegrationCallback
+import com.wingify.models.user.GatewayService
+import com.wingify.models.user.WingifyInitOptions
+import com.wingify.models.user.WingifyUserContext
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.concurrent.thread
 import kotlin.text.toLongOrNull
 
 const val SDK_NAME = "vwo-fme-flutter-sdk"
+const val WINGIFY_SDK_NAME = "wingify-fme-flutter-sdk"
 
 /**
- *  VWO (Visual Website Optimizer) is a powerful A/B testing and experimentation platform.
+ * Bridge between the Flutter method channel and the native FME SDK.
  *
- * This object provides a singleton instance for interacting with the VWO SDK. It offers methods
- * for initialization, configuration, feature flag evaluation, event tracking, and user attribute
- * management.
+ * The native SDK ships both the legacy `com.vwo` and the `com.wingify` APIs from a single
+ * binary, sharing one instance cache. Every call carries a `useWingifyApi` flag from Flutter:
+ * `true` routes through the Wingify API, `false` through the legacy VWO API. Since both clients
+ * derive from [WingifyClient], all post-init operations run against that common type and only
+ * initialization and instance lookup branch on the flag.
  */
+@Suppress("DEPRECATION") // Legacy com.vwo.* APIs are used intentionally for backward compatibility.
 class VWOBridge(private val context: Context) {
 
-    // Native SDK manages instances internally, no need to store here
-    private val flagMap: HashMap<String, GetFlag> = HashMap() // Store flags with their names
-
     /**
-     * Helper method to get VWO instance from native SDK
-     *
-     * @param accountId The account ID for the instance (optional)
-     * @param sdkKey The SDK key for the instance (optional)
-     * @return The VWO instance if found, or null if not provided/available
-     *
-     * Note: The native SDK caches instances internally, so calling getInstance()
-     * multiple times with the same accountId/sdkKey is efficient.
+     * Returns the initialized client for [accountId]/[sdkKey], using the Wingify or VWO lookup
+     * based on [useWingifyApi]. Both clients share the same cache but cast to sibling types, so
+     * the lookup must match the API used at initialization.
      */
-    private fun getVWOInstance(accountId: Int?, sdkKey: String?): VWO? {
-        return if (accountId != null && !sdkKey.isNullOrEmpty()) {
-            // Use native SDK's getInstance method directly
-            // The native SDK caches instances internally, so this is efficient
-            VWO.getInstance(accountId, sdkKey)
+    private fun getClient(
+        accountId: Int?,
+        sdkKey: String?,
+        useWingifyApi: Boolean
+    ): WingifyClient? {
+        if (accountId == null || sdkKey.isNullOrEmpty()) return null
+        return if (useWingifyApi) {
+            Wingify.getInstance(accountId, sdkKey)
         } else {
-            // If not provided, return null (native SDK will handle default)
-            null
+            VWO.getInstance(accountId, sdkKey)
         }
     }
 
     /**
-     * Initializes VWO-FME sdk sending the desired parameters to native SDK.
+     * Builds a [WingifyUserContext] from the map sent by Flutter. Accepted by both the Wingify
+     * and VWO native APIs.
+     */
+    private fun buildUserContext(map: Map<*, *>): WingifyUserContext {
+        return WingifyUserContext().apply {
+            id = map["id"] as? String
+            (map["customVariables"] as? Map<String, Any>)?.let { customVariables.putAll(it) }
+            (map["variationTargetingVariables"] as? Map<String, Any>)?.let {
+                variationTargetingVariables.putAll(it)
+            }
+            shouldUseDeviceIdAsUserId = map["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
+            (map["gatewayService"] as? Map<*, *>)?.let { gateway ->
+                vwo = GatewayService().apply {
+                    location = gateway["location"] as? Map<String, String>
+                }
+            }
+        }
+    }
+
+    /**
+     * Initializes the FME SDK, routing through the Wingify or legacy VWO API.
      */
     fun initializeVWO(call: MethodCall, result: Result, channel: MethodChannel) {
 
@@ -95,7 +115,6 @@ class VWOBridge(private val context: Context) {
         val gatewayServiceMap = args["gatewayService"] as? Map<*, *>
         val pollInterval = (args["pollInterval"] as? Int) ?: 0
         val cachedSettingsExpiryTime = (args["cachedSettingsExpiryTime"] as? Int) ?: 0
-        val loggerLevel = args["loggerLevel"] as? String ?: "TRACE"
         val batchMinSize = (args["batchMinSize"] as? Int) ?: -1
         val batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String
         val batchUploadTimeInterval = batchUploadTimeIntervalString?.toLongOrNull() ?: -1L
@@ -104,8 +123,11 @@ class VWOBridge(private val context: Context) {
         val vwoMeta = args["_vwo_meta"] as? Map<String, Any> ?: mapOf()
         val hasIntegrations = args["hasIntegrations"] as? Boolean ?: false
         val isAliasingEnabled = args["isAliasingEnabled"] as? Boolean ?: false
+        val useWingifyApi = args["useWingifyApi"] as? Boolean ?: false
 
-        val vwoInitOptions = VWOInitOptions().apply {
+        val initOptions: WingifyInitOptions =
+            if (useWingifyApi) WingifyInitOptions() else VWOInitOptions()
+        initOptions.apply {
             this.sdkKey = sdkKey
             this.accountId = accountId
             logger?.let { map ->
@@ -139,7 +161,7 @@ class VWOBridge(private val context: Context) {
             }
             this.context = this@VWOBridge.context.applicationContext
             this.sdkVersion = sdkVersion
-            this.sdkName = SDK_NAME
+            this.sdkName = if (useWingifyApi) WINGIFY_SDK_NAME else SDK_NAME
             this.isUsageStatsDisabled = isUsageStatsDisabled
             this._vwo_meta = vwoMeta
             this.isAliasingEnabled = isAliasingEnabled
@@ -147,7 +169,7 @@ class VWOBridge(private val context: Context) {
 
         // Only set integrations if provided by the client
         if (hasIntegrations) {
-            vwoInitOptions.integrations = object : IntegrationCallback {
+            initOptions.integrations = object : IntegrationCallback {
                 override fun execute(properties: Map<String, Any>) {
                     Handler(Looper.getMainLooper()).post {
                         // Filter out objects and keep only basic data types
@@ -158,16 +180,27 @@ class VWOBridge(private val context: Context) {
             }
         }
 
-        VWO.init(vwoInitOptions, object : IVwoInitCallback {
-            override fun vwoInitSuccess(vwo: VWO, message: String) {
-                // Native SDK manages instances internally, no need to store here
-                result.success("VWO is ready to use.")
-            }
+        if (useWingifyApi) {
+            Wingify.init(initOptions, object : IWingifyInitCallback {
+                override fun wingifyInitSuccess(wingify: Wingify, message: String) {
+                    result.success("Wingify is ready to use.")
+                }
 
-            override fun vwoInitFailed(message: String) {
-                result.error("INIT_ERROR", message, null)
-            }
-        })
+                override fun wingifyInitFailed(message: String) {
+                    result.error("INIT_ERROR", message, null)
+                }
+            })
+        } else {
+            VWO.init(initOptions as VWOInitOptions, object : IVwoInitCallback {
+                override fun vwoInitSuccess(vwo: VWO, message: String) {
+                    result.success("VWO is ready to use.")
+                }
+
+                override fun vwoInitFailed(message: String) {
+                    result.error("INIT_ERROR", message, null)
+                }
+            })
+        }
     }
 
     /**
@@ -201,7 +234,6 @@ class VWOBridge(private val context: Context) {
         nativeTransport["defaultTransport"] = object : LogTransport {
             override fun log(level: LogLevelEnum, message: String?) {
                 if (message == null) return
-                //Log.d("FME", message)
                 Handler(Looper.getMainLooper()).post {
 
                     val properties = mapOf<String, Any>(
@@ -219,7 +251,7 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * This method is used to get the flag value for the given feature key
+     * Gets the flag value for the given feature key.
      */
     fun getFlag(call: MethodCall, result: Result) {
         try {
@@ -227,93 +259,46 @@ class VWOBridge(private val context: Context) {
             val flagName = args?.get("flagName") as? String
             val userContextMap = args?.get("userContext") as? Map<*, *>
 
-            // Validate required arguments
             if (flagName == null || userContextMap == null) {
                 result.error("INVALID_ARGUMENTS", "flagName and userContext are required", null)
                 return
             }
 
-            // Extract accountId and sdkKey for multi-instance support (optional)
-            val accountId = args?.get("accountId") as? Int
-            val sdkKey = args?.get("sdkKey") as? String
-
-            // Create VWOUserContext from userContextMap
-            val userContext = VWOUserContext().apply {
-                id = userContextMap["id"] as? String
-
-                customVariables.putAll(
-                    userContextMap["customVariables"] as? Map<String, Any> ?: emptyMap()
-                )
-                variationTargetingVariables.putAll(
-                    userContextMap["variationTargetingVariables"] as? Map<String, Any> ?: emptyMap()
-                )
-
-                shouldUseDeviceIdAsUserId =
-                    userContextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
-            }
-
-            // Handle gatewayService if present
-            val gatewayServiceMap = userContextMap["gatewayService"] as? Map<*, *>
-            if (gatewayServiceMap != null) {
-                val gatewayService = GatewayService().apply {
-                    location = gatewayServiceMap["location"] as? Map<String, String>
-                }
-                userContext.vwo = gatewayService
-            }
-
-            // Get the appropriate instance or use default
-            val vwoInstance = getVWOInstance(accountId, sdkKey)
-            handleGetFlag(vwoInstance, flagName, userContext, result)
-        } catch (e: Exception) {
-            // Handle unexpected errors
-            result.error(
-                "UNEXPECTED_ERROR",
-                "An unexpected error occurred: ${e.message}",
-                e.stackTraceToString()
+            val client = getClient(
+                args["accountId"] as? Int,
+                args["sdkKey"] as? String,
+                args["useWingifyApi"] as? Boolean ?: false
             )
-        }
-    }
-
-    private fun handleGetFlag(
-        vwoInstance: VWO?,
-        flagName: String,
-        userContext: VWOUserContext,
-        result: Result
-    ) {
-        try {
-
-            if (vwoInstance == null) {
+            if (client == null) {
                 result.error(
                     "UNEXPECTED_ERROR",
-                    "Could not get VWO instance, please ensure VWO is initialized properly.",
+                    "Could not get instance, please ensure the SDK is initialized properly.",
                     null
                 )
                 return
             }
 
-            vwoInstance.getFlag(flagName, userContext, object : IVwoListener {
-                override fun onSuccess(data: Any) {
-                    val featureFlag = data as? GetFlag
-                    val response = if (featureFlag != null) {
-                        mapOf(
-                            "isEnabled" to featureFlag.isEnabled(),
-                            "variables" to featureFlag.getVariables()
-                        )
-                    } else {
-                        mapOf(
-                            "isEnabled" to false,
-                            "variables" to listOf<Map<String, Any>>()
-                        )
-                    }
-                    result.success(response)
-                }
+            val userContext = buildUserContext(userContextMap)
 
-                override fun onFailure(message: String) {
-                    result.error("FLAG_ERROR", message, null)
+            // Mirror the native async overloads by evaluating off the platform thread.
+            thread(start = true) {
+                try {
+                    val flag = client.getFlag(flagName, userContext)
+                    result.success(
+                        mapOf(
+                            "isEnabled" to flag.isEnabled(),
+                            "variables" to flag.getVariables()
+                        )
+                    )
+                } catch (e: Exception) {
+                    result.error(
+                        "FLAG_ERROR",
+                        e.message ?: e.toString(),
+                        e.stackTraceToString()
+                    )
                 }
-            })
+            }
         } catch (e: Exception) {
-            // Handle unexpected errors in the VWO SDK call
             result.error(
                 "UNEXPECTED_ERROR",
                 "An unexpected error occurred: ${e.message}",
@@ -323,12 +308,12 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Track method to track the event.
+     * Tracks an event.
      */
     fun trackEvent(call: MethodCall, result: Result) {
         val args = call.arguments as? Map<*, *>
         val eventName = args?.get("eventName") as? String
-        val contextMap = args?.get("context") as? Map<String, Any>
+        val contextMap = args?.get("context") as? Map<*, *>
         val eventProperties = args?.get("eventProperties") as? Map<String, Any>
 
         if (eventName.isNullOrBlank() || contextMap == null) {
@@ -340,66 +325,28 @@ class VWOBridge(private val context: Context) {
             return
         }
 
-        // Extract accountId and sdkKey for multi-instance support (optional)
-        val accountId = args?.get("accountId") as? Int
-        val sdkKey = args?.get("sdkKey") as? String
+        val client = getClient(
+            args["accountId"] as? Int,
+            args["sdkKey"] as? String,
+            args["useWingifyApi"] as? Boolean ?: false
+        )
+        if (client == null) {
+            result.error(
+                "UNEXPECTED_ERROR",
+                "Could not get instance, please ensure the SDK is initialized properly.",
+                null
+            )
+            return
+        }
 
-        // Get the appropriate instance or use default
-        val vwoInstance = getVWOInstance(accountId, sdkKey)
-        handleTrackEvent(vwoInstance, eventName, contextMap, eventProperties, result)
-    }
-
-    /**
-     * Track method to track the event.
-     */
-    private fun handleTrackEvent(
-        vwoInstance: VWO?,
-        eventName: String,
-        contextMap: Map<String, Any>,
-        eventProperties: Map<String, Any>?,
-        result: Result
-    ) {
         try {
-            // Convert the incoming context map to a VWOUserContext object
-            val context = VWOUserContext().apply {
-                id = contextMap["id"] as? String
-
-                customVariables =
-                    contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
-                variationTargetingVariables =
-                    contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
-                        ?: mutableMapOf()
-
-                shouldUseDeviceIdAsUserId =
-                    contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
-            }
-
-            if (vwoInstance == null) {
-                result.error(
-                    "UNEXPECTED_ERROR",
-                    "Could not get VWO instance, please ensure VWO is initialized properly.",
-                    null
-                )
-                return
-            }
-
-            // Call the appropriate `trackEvent` method based on the presence of eventProperties
+            val context = buildUserContext(contextMap)
             val trackingResult = if (eventProperties == null) {
-                vwoInstance.trackEvent(eventName, context)
+                client.trackEvent(eventName, context)
             } else {
-                vwoInstance.trackEvent(eventName, context, eventProperties)
+                client.trackEvent(eventName, context, eventProperties)
             }
-
-            if (trackingResult != null) {
-                // Send the result map back to Flutter
-                result.success(trackingResult)
-            } else {
-                result.error(
-                    "TRACK_EVENT_FAILED",
-                    "Tracking event returned null",
-                    null
-                )
-            }
+            result.success(trackingResult)
         } catch (e: Exception) {
             result.error(
                 "TRACK_EVENT_ERROR",
@@ -410,13 +357,12 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Sets an attribute for a user in the context provided.
-     * This method validates the types of the inputs before proceeding with the API call.
+     * Sets attributes for a user in the context provided.
      */
     fun setAttribute(call: MethodCall, result: Result) {
         val args = call.arguments as? Map<*, *>
         val attributes = args?.get("attributes") as? Map<String, Any>
-        val contextMap = args?.get("context") as? Map<String, Any>
+        val contextMap = args?.get("context") as? Map<*, *>
 
         if (attributes == null || contextMap == null) {
             result.error(
@@ -427,49 +373,23 @@ class VWOBridge(private val context: Context) {
             return
         }
 
-        // Extract accountId and sdkKey for multi-instance support (optional)
-        val accountId = args?.get("accountId") as? Int
-        val sdkKey = args?.get("sdkKey") as? String
+        val client = getClient(
+            args["accountId"] as? Int,
+            args["sdkKey"] as? String,
+            args["useWingifyApi"] as? Boolean ?: false
+        )
+        if (client == null) {
+            result.error(
+                "UNEXPECTED_ERROR",
+                "Could not get instance, please ensure the SDK is initialized properly.",
+                null
+            )
+            return
+        }
 
-        // Get the appropriate instance or use default
-        val vwoInstance = getVWOInstance(accountId, sdkKey)
-        handleSetAttribute(vwoInstance, attributes, contextMap, result)
-    }
-
-    /**
-     * Sets an attribute for a user in the context provided.
-     * This method validates the types of the inputs before proceeding with the API call.
-     */
-    private fun handleSetAttribute(
-        vwoInstance: VWO?,
-        attributes: Map<String, Any>,
-        contextMap: Map<String, Any>,
-        result: Result
-    ) {
         try {
-            // Convert contextMap to VWOUserContext object
-            val context = VWOUserContext().apply {
-                id = contextMap["id"] as? String
-                customVariables =
-                    contextMap["customVariables"] as? MutableMap<String, Any> ?: mutableMapOf()
-                variationTargetingVariables =
-                    contextMap["variationTargetingVariables"] as? MutableMap<String, Any>
-                        ?: mutableMapOf()
-                shouldUseDeviceIdAsUserId =
-                    contextMap["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
-            }
-
-            if (vwoInstance == null) {
-                result.error(
-                    "UNEXPECTED_ERROR",
-                    "Could not get VWO instance, please ensure VWO is initialized properly.",
-                    null
-                )
-                return
-            }
-
-            vwoInstance.setAttribute(attributes, context)
-            result.success(true) // Return success to Flutter
+            client.setAttribute(attributes, buildUserContext(contextMap))
+            result.success(true)
         } catch (e: Exception) {
             result.error(
                 "SET_ATTRIBUTE_ERROR",
@@ -515,7 +435,7 @@ class VWOBridge(private val context: Context) {
 
                 else -> {
                     // Skip other types (e.g., objects)
-                    Log.w("VWO", "Skipping non-basic data type for key: $key")
+                    Log.w("FME", "Skipping non-basic data type for key: $key")
                 }
             }
         }
@@ -524,7 +444,7 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Function to set the session data.
+     * Sets the session data.
      */
     fun setSessionData(call: MethodCall, result: Result) {
 
@@ -538,21 +458,21 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Function to send SDK initialization event with timing information.
+     * Sends the SDK initialization event with timing information.
      */
     fun sendSdkInitEvent(call: MethodCall, result: Result) {
         try {
-
-            val accountId = call.argument<String>("accountId") as? Int
-            val sdkKey = call.argument<String>("sdkKey")
+            val args = call.arguments as? Map<*, *>
+            val accountId = args?.get("accountId") as? Int
+            val sdkKey = args?.get("sdkKey") as? String
+            val useWingifyApi = args?.get("useWingifyApi") as? Boolean ?: false
 
             if (accountId == null || sdkKey == null) {
                 result.error("INVALID_ARGUMENTS", "Invalid accountId and sdkKey passed.", null)
                 return
             }
 
-            val sdkInitTimeStr = call.argument<String>("sdkInitTime")
-
+            val sdkInitTimeStr = args["sdkInitTime"] as? String
             if (sdkInitTimeStr == null) {
                 result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
                 return
@@ -564,9 +484,7 @@ class VWOBridge(private val context: Context) {
                 return
             }
 
-            // Use default instance for sendSdkInitEvent
-            val instance = VWO.getInstance(accountId, sdkKey)
-            instance?.sendSdkInitEvent(sdkInitTime)
+            getClient(accountId, sdkKey, useWingifyApi)?.sendSdkInitEvent(sdkInitTime)
             result.success(true)
         } catch (e: Exception) {
             result.error(
@@ -578,27 +496,19 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Sets an alias for the current user in VWO.
-     * This method allows you to associate an alias ID with a user context for tracking purposes.
-     *
-     * @param call MethodCall containing the following arguments:
-     *   - "aliasId": String - The alias identifier to set for the user (required, cannot be null or empty)
-     *   - "context": Map<String, Any> - User context containing:
-     *     - "id": String - User identifier
-     *     - "shouldUseDeviceIdAsUserId": Boolean - Whether to use device ID as user ID (optional, defaults to false)
-     * @param result Result object to return success/error status to Flutter
+     * Sets an alias for the current user.
      */
     fun setAlias(call: MethodCall, result: Result) {
 
         val contextMap = call.argument<Map<String, Any>>("userContext")
-        val aliasId = (call.argument<String>("alias") as? String)
+        val aliasId = call.argument<String>("alias")
 
-        if (aliasId == null || aliasId.isBlank()) {
-            result.error("VWO", "alias parameter is required and cannot be null or empty.", null)
+        if (aliasId.isNullOrBlank()) {
+            result.error("FME", "alias parameter is required and cannot be null or empty.", null)
             return
         }
 
-        if (contextMap == null || aliasId.isNullOrBlank()) {
+        if (contextMap == null) {
             result.error(
                 "INVALID_ARGUMENTS",
                 "userContext and alias are required",
@@ -607,30 +517,22 @@ class VWOBridge(private val context: Context) {
             return
         }
 
-        // Extract accountId and sdkKey for multi-instance support (optional)
         val args = call.arguments as? Map<*, *>
-        val accountId = args?.get("accountId") as? Int
-        val sdkKey = args?.get("sdkKey") as? String
+        val client = getClient(
+            args?.get("accountId") as? Int,
+            args?.get("sdkKey") as? String,
+            args?.get("useWingifyApi") as? Boolean ?: false
+        )
 
-        val vwoInstance = getVWOInstance(accountId, sdkKey)
+        if (client == null) {
+            val message = "SDK is not initialized, please try again later."
+            result.error("SET_ALIAS_ERROR", message, null)
+            Log.e("FME", message)
+            return
+        }
 
         try {
-            // Convert contextMap to VWOUserContext object
-            val context = VWOUserContext().apply {
-                id = contextMap["id"] as? String
-                shouldUseDeviceIdAsUserId =
-                    (contextMap?.get("shouldUseDeviceIdAsUserId") as? Boolean) ?: false
-            }
-
-            if(vwoInstance == null) {
-                val message = "SDK is not initialized, please try again later."
-                result.error("SET_ALIAS_ERROR", message, null)
-                Log.e("VWO", message)
-                return
-            }
-
-            // Use the provided instance or fallback to default instance
-            vwoInstance.setAlias(context, aliasId)
+            client.setAlias(buildUserContext(contextMap), aliasId)
             result.success(true)
         } catch (e: Exception) {
             result.error(
@@ -642,10 +544,10 @@ class VWOBridge(private val context: Context) {
     }
 
     /**
-     * Clears a specific VWO instance.
+     * Clears a specific instance from the shared native cache.
      *
      * @param call The method call containing accountId and sdkKey
-     * @param result The result callback, if account id or sdkKey is missing will return error, else success
+     * @param result The result callback; returns an error if accountId or sdkKey is missing.
      */
     fun clearInstance(call: MethodCall, result: Result) {
         val args = call.arguments as? Map<*, *>
@@ -662,8 +564,8 @@ class VWOBridge(private val context: Context) {
         }
 
         try {
-            // Clear from native SDK (native SDK manages instances internally)
-            VWO.clearInstance(accountId, sdkKey)
+            // VWO.clearInstance delegates to Wingify.clearInstance; both target the shared cache.
+            Wingify.clearInstance(accountId, sdkKey)
             result.success(true)
         } catch (e: Exception) {
             result.error(

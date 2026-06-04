@@ -1,5 +1,5 @@
 /**
- * Copyright 2024-2025 Wingify Software Pvt. Ltd.
+ * Copyright 2024-2026 Wingify Software Pvt. Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 
 import Flutter
 import UIKit
-import VWO_FME
+import Wingify_FME
 
 //Constants
 private let SDK_NAME = "vwo-fme-flutter-sdk"
+private let WINGIFY_SDK_NAME = "wingify-fme-flutter-sdk"
 
 // Plugin constants
 private let INITIALIZE_VWO = "init"
@@ -31,44 +32,48 @@ private let IOS_CLEAR_INSTANCE = "clearInstance"
 private let IOS_SET_SESSION = "setSessionData"
 private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 
-/// The VWO FME Flutter SDK plugin for iOS.
+/// The FME Flutter SDK plugin for iOS.
 ///
-/// This plugin provides a bridge between the Flutter framework and the VWO FME SDK for iOS.
-/// It allows you to integrate VWO FME into your Flutter app and use its features, such as:
-///
-/// - Initializing the SDK
-/// - Getting feature flags
-/// - Tracking events
-/// - Setting user attributes
-///
-/// To use this plugin, add `vwo_fme_flutter_sdk` as a dependency in your pubspec.yaml file.
+/// This plugin bridges the Flutter framework and the native FME SDK for iOS. The single native
+/// pod ships both the legacy `VWOFme` and the `WingifyFme` APIs. Every call carries a
+/// `useWingifyApi` flag from Flutter: `true` routes through the Wingify API, `false` through the
+/// legacy VWO API. Branding (endpoints, device-id namespace, usage stats) is selected per call by
+/// the native API, so each operation must use the matching brand.
 public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallback, LogTransport {
 
     /// The Flutter method channel used to communicate with the Flutter framework.
     private var methodChannel: FlutterMethodChannel?
 
     private var logTransport: LogTransport?
-    
-    /// Helper method to get VWO instance from native SDK
-    /// 
-    /// - Parameters:
-    ///   - accountId: The account ID for the instance (optional)
-    ///   - sdkKey: The SDK key for the instance (optional)
-    /// 
-    /// - Returns: The VWO instance if found, or nil if not provided/available
-    /// 
-    /// Note: The native SDK caches instances internally, so calling getInstance()
-    /// multiple times with the same accountId/sdkKey is efficient.
+
     private func getVWOInstance(accountId: Int?, sdkKey: String?) -> VWOFme? {
-        guard let accountId = accountId, 
+        guard let accountId = accountId,
               let sdkKey = sdkKey,
               !sdkKey.isEmpty else {
-            // If not provided, return nil (native SDK will handle default)
             return nil
         }
-        // Use native SDK's getInstance method directly
-        // The native SDK caches instances internally, so this is efficient
         return VWOFme.getInstance(accountId: accountId, sdkKey: sdkKey)
+    }
+
+    private func getWingifyInstance(accountId: Int?, sdkKey: String?) -> WingifyFme? {
+        guard let accountId = accountId,
+              let sdkKey = sdkKey,
+              !sdkKey.isEmpty else {
+            return nil
+        }
+        return WingifyFme.getInstance(accountId: accountId, sdkKey: sdkKey)
+    }
+
+    private func vwoContext(_ dict: [String: Any]) -> VWOUserContext {
+        return VWOUserContext(id: dict["id"] as? String,
+                              shouldUseDeviceIdAsUserId: dict["shouldUseDeviceIdAsUserId"] as? Bool ?? false,
+                              customVariables: dict["customVariables"] as? [String: Any] ?? [:])
+    }
+
+    private func wingifyContext(_ dict: [String: Any]) -> WingifyUserContext {
+        return WingifyUserContext(id: dict["id"] as? String,
+                                  shouldUseDeviceIdAsUserId: dict["shouldUseDeviceIdAsUserId"] as? Bool ?? false,
+                                  customVariables: dict["customVariables"] as? [String: Any] ?? [:])
     }
 
     /// Registers the plugin with the Flutter framework.
@@ -112,7 +117,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         }
     }
 
-    /// Initializes the VWO SDK.
+    /// Initializes the SDK, routing through the Wingify or legacy VWO API.
     ///
     /// - Parameters:
     ///   - call: The method call.
@@ -135,6 +140,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let vwoMeta = args["_vwo_meta"] as? [String: Any] ?? [:]
         let hasIntegrations = args["hasIntegrations"] as? Bool ?? false
         let isAliasingEnabled = args["isAliasingEnabled"] as? Bool ?? false
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
         var batchUploadTimeInterval: Int64 = -1
         if let batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String {
@@ -147,43 +153,67 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             if let level = LogLevelEnum(rawValue: normalizedLevel) {
                 logLevel = level
             } else {
-                print("VWO Flutter Plugin: Invalid log level received: \(loggerLevel). Falling back to .error")
+                print("FME Flutter Plugin: Invalid log level received: \(loggerLevel). Falling back to .error")
             }
         }
-        
+
         // Initialize the logger
         if let logger = logger, let transports = logger["transports"] as? [[String: Any]], !transports.isEmpty {
             self.logTransport = self
         }
 
         let logPrefix = logger?["prefix"] as? String ?? ""
+        let integrations: IntegrationCallback? = hasIntegrations ? self : nil
+        let resolvedBatchMinSize = batchMinSize == -1 ? nil : batchMinSize
+        let resolvedBatchInterval: Int64? = batchUploadTimeInterval == -1 ? nil : batchUploadTimeInterval
 
-        let vwoOptions = VWOInitOptions(sdkKey: sdkKey,
-                                        accountId: accountId,
-                                        logLevel: logLevel,
-                                        logPrefix: logPrefix,
-                                        integrations: hasIntegrations ? self : nil,
-                                        gatewayService: gatewayService ?? [:],
-                                        cachedSettingsExpiryTime: cachedSettingsExpiryTime,
-                                        pollInterval: pollInterval,
-                                        batchMinSize: batchMinSize == -1 ? nil : batchMinSize,
-                                        batchUploadTimeInterval: batchUploadTimeInterval == -1 ? nil : batchUploadTimeInterval,
-                                        sdkName: SDK_NAME,
-                                        sdkVersion: sdkVersion,
-                                        logTransport: self.logTransport,
-                                        isUsageStatsDisabled: isUsageStatsDisabled,
-                                        vwoMeta: vwoMeta,
-                                        storage: nil,
-                                        isAliasingEnabled: isAliasingEnabled)
-
-        VWOFme.initialize(options: vwoOptions) { initResult in
+        let completion: WingifyInitCompletionHandler = { initResult in
             switch initResult {
             case .success(let message):
-                // Native SDK manages instances internally, no need to store here
                 result(message)
             case .failure(let error):
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
             }
+        }
+
+        if useWingifyApi {
+            let options = WingifyInitOptions(sdkKey: sdkKey,
+                                             accountId: accountId,
+                                             logLevel: logLevel,
+                                             logPrefix: logPrefix,
+                                             integrations: integrations,
+                                             gatewayService: gatewayService ?? [:],
+                                             cachedSettingsExpiryTime: cachedSettingsExpiryTime,
+                                             pollInterval: pollInterval,
+                                             batchMinSize: resolvedBatchMinSize,
+                                             batchUploadTimeInterval: resolvedBatchInterval,
+                                             sdkName: WINGIFY_SDK_NAME,
+                                             sdkVersion: sdkVersion,
+                                             logTransport: self.logTransport,
+                                             isUsageStatsDisabled: isUsageStatsDisabled,
+                                             vwoMeta: vwoMeta,
+                                             storage: nil,
+                                             isAliasingEnabled: isAliasingEnabled)
+            WingifyFme.initialize(options: options, completion: completion)
+        } else {
+            let options = VWOInitOptions(sdkKey: sdkKey,
+                                         accountId: accountId,
+                                         logLevel: logLevel,
+                                         logPrefix: logPrefix,
+                                         integrations: integrations,
+                                         gatewayService: gatewayService ?? [:],
+                                         cachedSettingsExpiryTime: cachedSettingsExpiryTime,
+                                         pollInterval: pollInterval,
+                                         batchMinSize: resolvedBatchMinSize,
+                                         batchUploadTimeInterval: resolvedBatchInterval,
+                                         sdkName: SDK_NAME,
+                                         sdkVersion: sdkVersion,
+                                         logTransport: self.logTransport,
+                                         isUsageStatsDisabled: isUsageStatsDisabled,
+                                         vwoMeta: vwoMeta,
+                                         storage: nil,
+                                         isAliasingEnabled: isAliasingEnabled)
+            VWOFme.initialize(options: options, completion: completion)
         }
     }
 
@@ -193,7 +223,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
     public func execute(_ properties: [String: Any]) {
         methodChannel?.invokeMethod("onIntegrationCallback", arguments: properties)
     }
-    
+
     /// LogTransport implementation
     public func log(logType: String, message: String) {
         let properties = [
@@ -216,34 +246,30 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Get accountId and sdkKey for multi-instance support (optional)
         let accountId = args["accountId"] as? Int
         let sdkKey = args["sdkKey"] as? String
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
-        // Initialize VWOUserContext with id, customVariables, shouldUseDeviceIdAsUserId
-        let shouldUseDeviceIdAsUserId = usrContext["shouldUseDeviceIdAsUserId"] as? Bool ?? false
-        let userContext = VWOUserContext(id: usrContext["id"] as? String,
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
-                                    customVariables: usrContext["customVariables"] as? [String: Any] ?? [:])
+        let handler: (GetFlag) -> Void = { flag in
+            result([
+                "isEnabled": flag.isEnabled(),
+                "variables": flag.getVariables(),
+            ])
+        }
 
-        // Get the appropriate instance or use default
-        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
-            // Use instance method
-            instance.getFlag(featureKey: flagName, context: userContext) { flag in
-                let flagResult: [String: Any] = [
-                    "isEnabled": flag.isEnabled(),
-                    "variables": flag.getVariables(),
-                ]
-                result(flagResult)
+        if useWingifyApi {
+            let userContext = wingifyContext(usrContext)
+            if let instance = getWingifyInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.getFlag(featureKey: flagName, context: userContext, completion: handler)
+            } else {
+                WingifyFme.getFlag(featureKey: flagName, context: userContext, completion: handler)
             }
         } else {
-            // Fallback to static method (default instance)
-            VWOFme.getFlag(featureKey: flagName, context: userContext) { flag in
-                let flagResult: [String: Any] = [
-                    "isEnabled": flag.isEnabled(),
-                    "variables": flag.getVariables(),
-                ]
-                result(flagResult)
+            let userContext = vwoContext(usrContext)
+            if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.getFlag(featureKey: flagName, context: userContext, completion: handler)
+            } else {
+                VWOFme.getFlag(featureKey: flagName, context: userContext, completion: handler)
             }
         }
     }
@@ -261,35 +287,27 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Get accountId and sdkKey for multi-instance support (optional)
         let accountId = args["accountId"] as? Int
         let sdkKey = args["sdkKey"] as? String
-
         let eventProperties = args["eventProperties"] as? [String: Any]
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
-        let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
-        let userContext = VWOUserContext(id: context["id"] as? String,
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
-                                    customVariables: context["customVariables"] as? [String: Any] ?? [:])
-
-        // Get the appropriate instance or use default
-        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
-            // Use instance method
-            if let properties = eventProperties {
-                instance.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
+        if useWingifyApi {
+            let userContext = wingifyContext(context)
+            if let instance = getWingifyInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.trackEvent(eventName: eventName, context: userContext, eventProperties: eventProperties)
             } else {
-                instance.trackEvent(eventName: eventName, context: userContext)
+                WingifyFme.trackEvent(eventName: eventName, context: userContext, eventProperties: eventProperties)
             }
         } else {
-            // Fallback to static method (default instance)
-            if let properties = eventProperties {
-                VWOFme.trackEvent(eventName: eventName, context: userContext, eventProperties: properties)
+            let userContext = vwoContext(context)
+            if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.trackEvent(eventName: eventName, context: userContext, eventProperties: eventProperties)
             } else {
-                VWOFme.trackEvent(eventName: eventName, context: userContext)
+                VWOFme.trackEvent(eventName: eventName, context: userContext, eventProperties: eventProperties)
             }
         }
-        let response: [String: Bool] = ["success": true]
-        result(response)
+        result(["success": true])
     }
 
     /// Sets a user attribute.
@@ -305,23 +323,24 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Get accountId and sdkKey for multi-instance support (optional)
         let accountId = args["accountId"] as? Int
         let sdkKey = args["sdkKey"] as? String
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
-        let shouldUseDeviceIdAsUserId = context["shouldUseDeviceIdAsUserId"] as? Bool ?? false
-
-        let userContext = VWOUserContext(id: context["id"] as? String,
-                                    shouldUseDeviceIdAsUserId: shouldUseDeviceIdAsUserId,
-                                    customVariables: context["customVariables"] as? [String: Any] ?? [:])
-        
-        // Get the appropriate instance from native SDK
-        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
-            // Use instance method
-            instance.setAttribute(attributes: attributes, context: userContext)
+        if useWingifyApi {
+            let userContext = wingifyContext(context)
+            if let instance = getWingifyInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.setAttribute(attributes: attributes, context: userContext)
+            } else {
+                WingifyFme.setAttribute(attributes: attributes, context: userContext)
+            }
         } else {
-            // Fallback to static method (default instance)
-            VWOFme.setAttribute(attributes: attributes, context: userContext)
+            let userContext = vwoContext(context)
+            if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.setAttribute(attributes: attributes, context: userContext)
+            } else {
+                VWOFme.setAttribute(attributes: attributes, context: userContext)
+            }
         }
         result(true)
     }
@@ -339,25 +358,29 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Get accountId and sdkKey for multi-instance support (optional)
         let accountId = args["accountId"] as? Int
         let sdkKey = args["sdkKey"] as? String
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
-        let userContext = VWOUserContext(id: userContextDict["id"] as? String,
-                                    customVariables: userContextDict["customVariables"] as? [String: Any] ?? [:])
-        
-        // Get the appropriate instance from native SDK
-        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
-            // Use instance method
-            instance.setAlias(from: userContext, to: alias)
+        if useWingifyApi {
+            let userContext = wingifyContext(userContextDict)
+            if let instance = getWingifyInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.setAlias(from: userContext, to: alias)
+            } else {
+                WingifyFme.setAlias(from: userContext, to: alias)
+            }
         } else {
-            // Fallback to static method (default instance)
-            VWOFme.setAlias(from: userContext, to: alias)
+            let userContext = vwoContext(userContextDict)
+            if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
+                instance.setAlias(from: userContext, to: alias)
+            } else {
+                VWOFme.setAlias(from: userContext, to: alias)
+            }
         }
         result(true)
     }
 
-    /// Clears a specific VWO instance.
+    /// Clears a specific instance from the shared native cache.
     ///
     /// - Parameters:
     ///   - call: The method call.
@@ -369,10 +392,13 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "accountId and sdkKey are required", details: nil))
             return
         }
-        
-        // Clear from native SDK (native SDK manages instances internally)
-        VWOFme.clearInstance(accountId: accountId, sdkKey: sdkKey)
-        
+
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
+        if useWingifyApi {
+            WingifyFme.clearInstance(accountId: accountId, sdkKey: sdkKey)
+        } else {
+            VWOFme.clearInstance(accountId: accountId, sdkKey: sdkKey)
+        }
         result(true)
     }
 
@@ -405,15 +431,15 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             return
         }
 
-        // Call the native VWO SDK's sendSdkInitEvent method
         let accountId = args["accountId"] as? Int
         let sdkKey = args["sdkKey"] as? String
+        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
-        // Get the appropriate instance or use default
-        if let instance = getVWOInstance(accountId: accountId, sdkKey: sdkKey) {
-            // Use instance method
-            instance.sendSdkInitEvent(sdkInitTime: sdkInitTime)
-        } 
+        if useWingifyApi {
+            getWingifyInstance(accountId: accountId, sdkKey: sdkKey)?.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        } else {
+            getVWOInstance(accountId: accountId, sdkKey: sdkKey)?.sendSdkInitEvent(sdkInitTime: sdkInitTime)
+        }
 
         result(true)
     }

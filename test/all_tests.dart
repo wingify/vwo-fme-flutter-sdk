@@ -14,6 +14,7 @@ import 'vwo_simple_test.dart' as vwo_simple_test;
 import 'method_channel_test.dart' as method_channel_test;
 import 'platform_interface_test.dart' as platform_interface_test;
 import 'vwo_test.dart' as vwo_test;
+import 'wingify_test.dart' as wingify_test;
 
 void main() {
   // Run all test groups
@@ -30,4 +31,5 @@ void main() {
   method_channel_test.main();
   platform_interface_test.main();
   vwo_test.main();
+  wingify_test.main();
 }
