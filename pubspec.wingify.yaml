@@ -2,7 +2,7 @@ name: wingify_fme_flutter_sdk
 description: Wingify FME is a solution where you integrate Wingify's SDK in your app codebase and can run feature tests, rollouts, personalization and experimentation campaigns.
 #Update version in lib/utils/constants.dart as well.
 #1.0.0: This is the version name (Major.Minor.Patch).
-version: 1.50.0
+version: 1.55.0
 homepage: https://wingify.com
 publish_to: none
 

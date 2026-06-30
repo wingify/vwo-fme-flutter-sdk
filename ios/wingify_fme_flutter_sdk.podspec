@@ -15,10 +15,14 @@ Wingify is a server-side solution where you integrate Wingify's SDK in your serv
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'Wingify-FME','1.50.0'
+  s.dependency 'Wingify-FME','1.55.0'
   s.platform = :ios, '12.0'
 
   # Flutter.framework does not contain a i386 slice.
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => '$(inherited) WINGIFY_FME_FLUTTER_SDK'
+  }
   s.swift_version = '5.0'
 end
