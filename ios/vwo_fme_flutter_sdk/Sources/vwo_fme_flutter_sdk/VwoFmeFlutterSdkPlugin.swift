@@ -22,7 +22,7 @@ import Wingify_FME
 #elseif VWO_FME_FLUTTER_SDK
 import VWO_FME
 #else
-#error("Build with vwo_fme_flutter_sdk or wingify_fme_flutter_sdk podspec so the correct native FME module is linked.")
+#error("Build with vwo_fme_flutter_sdk or wingify_fme_flutter_sdk (CocoaPods podspec or Swift Package) so the correct native FME module is linked.")
 #endif
 
 //Constants
@@ -41,11 +41,12 @@ private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 
 /// The FME Flutter SDK plugin for iOS.
 ///
-/// This plugin bridges the Flutter framework and the native FME SDK for iOS. The linked native pod
-/// depends on the published Flutter package (`VWO-FME` for `vwo_fme_flutter_sdk`, `Wingify-FME`
-/// for `wingify_fme_flutter_sdk`). Both native modules expose the legacy `VWOFme` and `WingifyFme`
-/// APIs. Every call carries a `useWingifyApi` flag from Flutter: `true` routes through the Wingify
-/// API, `false` through the legacy VWO API.
+/// This plugin bridges the Flutter framework and the native FME SDK for iOS. The linked native
+/// dependency depends on the published Flutter package (`VWO-FME` for `vwo_fme_flutter_sdk`,
+/// `Wingify-FME` for `wingify_fme_flutter_sdk`), resolved via CocoaPods or Swift Package Manager.
+/// Both native modules expose the legacy `VWOFme` and `WingifyFme` APIs. Every call carries a
+/// `useWingifyApi` flag from Flutter: `true` routes through the Wingify API, `false` through the
+/// legacy VWO API.
 public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallback, LogTransport {
 
     /// The Flutter method channel used to communicate with the Flutter framework.
