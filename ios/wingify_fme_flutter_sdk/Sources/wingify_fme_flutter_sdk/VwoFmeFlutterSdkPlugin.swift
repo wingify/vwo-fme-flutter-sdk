@@ -1,0 +1,1 @@
+../../../vwo_fme_flutter_sdk/Sources/vwo_fme_flutter_sdk/VwoFmeFlutterSdkPlugin.swift

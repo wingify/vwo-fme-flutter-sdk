@@ -31,3 +31,7 @@ build/
 example/
 **/*.mocks.dart
 coverage/
+
+# Swift Package Manager
+.build/
+.swiftpm/
