@@ -24,11 +24,13 @@ class VWOInitOptions extends WingifyInitOptions {
     super.gatewayService,
     super.pollInterval,
     super.cachedSettingsExpiryTime,
+    super.cachedDecisionExpiryTime,
     super.integrations,
     super.batchMinSize = -1,
     super.batchUploadTimeInterval = -1,
     super.isUsageStatsDisabled = false,
     super.isAliasingEnabled = false,
+    super.shouldTriggerIntegrationCallbackAlways = false,
   });
 
   @override
@@ -51,11 +53,13 @@ class VWOInitOptions extends WingifyInitOptions {
         'gatewayService: $gatewayService, '
         'pollInterval: $pollInterval, '
         'cachedSettingsExpiryTime: $cachedSettingsExpiryTime, '
+        'cachedDecisionExpiryTime: $cachedDecisionExpiryTime, '
         'integrationCallback: ${integrations != null ? 'Provided' : 'Not Provided'}, '
         'batchMinSize: $batchMinSize, '
         'batchUploadTimeInterval: $batchUploadTimeInterval, '
         'isUsageStatsDisabled: $isUsageStatsDisabled, '
         'isAliasingEnabled: $isAliasingEnabled, '
+        'shouldTriggerIntegrationCallbackAlways: $shouldTriggerIntegrationCallbackAlways, '
         'vwo_meta: $platformMeta)';
   }
 }

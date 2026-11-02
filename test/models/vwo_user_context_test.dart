@@ -11,6 +11,9 @@ void main() {
       // Assert
       expect(userContext.id, equals('user123'));
       expect(userContext.customVariables, isNull);
+      expect(userContext.bucketingSeed, isNull);
+      expect(userContext.postSegmentationVariables, isNull);
+      expect(userContext.ipAddress, isNull);
     });
 
     test('should create instance with id and custom variables', () {
@@ -42,6 +45,9 @@ void main() {
       final userContext = VWOUserContext(
         id: 'user123',
         customVariables: customVariables,
+        bucketingSeed: 'stable-seed-123',
+        postSegmentationVariables: ['plan', 'country'],
+        ipAddress: '1.2.3.4',
       );
 
       // Act
@@ -50,6 +56,9 @@ void main() {
       // Assert
       expect(map['id'], equals('user123'));
       expect(map['customVariables'], equals(customVariables));
+      expect(map['bucketingSeed'], equals('stable-seed-123'));
+      expect(map['postSegmentationVariables'], equals(['plan', 'country']));
+      expect(map['ipAddress'], equals('1.2.3.4'));
     });
 
     test('should convert to map with null custom variables', () {

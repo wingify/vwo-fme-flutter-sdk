@@ -105,13 +105,13 @@ abstract class VwoFmeFlutterSdkPlatform extends PlatformInterface {
     throw UnimplementedError('setSessionData() has not been implemented.');
   }
 
-  /// Sends SDK initialization event with timing information.
-  ///
-  /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
-  ///
-  /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
+  /// No-op. Android and iOS send vwo_initCalled themselves once init succeeds.
+  /// Still here so older call sites keep compiling.
+  @Deprecated(
+    'Native sends the init event during init. Calling this does nothing.',
+  )
   Future<bool> sendSdkInitEvent(
       int sdkInitTime, int? accountId, String? sdkKey) {
-    throw UnimplementedError('sendSdkInitEvent() has not been implemented.');
+    return Future.value(true);
   }
 }

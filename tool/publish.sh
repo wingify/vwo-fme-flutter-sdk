@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 #
 # Publishes one of the two packages built from this single source tree:
-#   - vwo_fme_flutter_sdk      (the legacy/default manifest: pubspec.yaml + README.md)
-#   - wingify_fme_flutter_sdk  (the rebrand manifest: pubspec.wingify.yaml + README_wingify.md)
+#   - vwo_fme_flutter_sdk      (pubspec.yaml + README.md + ios/vwo_fme_flutter_sdk.podspec)
+#   - wingify_fme_flutter_sdk  (pubspec.wingify.yaml + README_wingify.md + ios/wingify_fme_flutter_sdk.podspec)
 #
 # Usage:
 #   tool/publish.sh vwo       [--version X.Y.Z] [--dry-run] [-- extra flutter pub publish args]
 #   tool/publish.sh wingify   [--version X.Y.Z] [--dry-run] [-- extra flutter pub publish args]
 #
-# Dry run (--dry-run): validates the package with `flutter pub publish --dry-run`
-# (no upload). Skips the interactive version prompt; version alignment is still
-# checked. Exits with flutter's status (0 = validation passed, non-zero = failed).
+# CI (non-interactive, no upload prompt):
+#   tool/publish.sh vwo --version 1.60.0 -- --force
+#
+# Dry run (--dry-run): `flutter pub publish --dry-run` (no upload). Skips the
+# version prompt. Version alignment is still checked.
 #
 # Version check (always runs before publish):
 #   - Without --version: prompts to confirm the latest CHANGELOG version, then
@@ -18,16 +20,63 @@
 #     lib/utils/constants.dart (sdkVersion).
 #   - With --version X.Y.Z: skips the prompt; all four must equal X.Y.Z exactly.
 #
-# The script temporarily swaps pubspec.yaml / README.md for the chosen brand,
-# strips `publish_to: none` so the package can be published, runs
-# `flutter pub publish`, then restores the working tree.
+# CocoaPods rejects an ios/ directory with two podspecs, so the other brand's
+# podspec is moved aside (and listed in .pubignore) for the duration of the
+# publish. pubspec.yaml / README.md are swapped and `publish_to: none` is
+# stripped. Those edits are marked assume-unchanged so pub sees a clean git
+# tree. Backups live outside the repo. Everything is restored on exit.
+# tool/publish.sh itself is ignored by the clean-tree check.
 set -euo pipefail
 
 readonly RED='\033[0;31m'
 readonly NC='\033[0m'
+readonly RELEASE_IGNORED_PATH='tool/publish.sh'
+
+GIT_ASSUME_UNCHANGED=()
+BACKUP_DIR=""
+
+log() {
+  printf '[publish] %s\n' "$*" >&2
+}
 
 err() {
-  printf '%b%s%b\n' "$RED" "$*" "$NC" >&2
+  printf '%b[publish] %s%b\n' "$RED" "$*" "$NC" >&2
+}
+
+git_assume_unchanged() {
+  local path="$1"
+  if git ls-files --error-unmatch "$path" &>/dev/null; then
+    git update-index --assume-unchanged "$path"
+    GIT_ASSUME_UNCHANGED+=("$path")
+  fi
+}
+
+git_restore_assume_unchanged() {
+  local path
+  for path in "${GIT_ASSUME_UNCHANGED[@]}"; do
+    git update-index --no-assume-unchanged "$path" 2>/dev/null || true
+  done
+  GIT_ASSUME_UNCHANGED=()
+}
+
+check_git_clean() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    log "Not a git repository; skipping clean working tree check"
+    return 0
+  fi
+
+  local dirty ignored
+  dirty="$(git status --porcelain | grep -vE "(^|[[:space:]])${RELEASE_IGNORED_PATH//\//\\/}\$" || true)"
+  ignored="$(git status --porcelain | grep -E "(^|[[:space:]])${RELEASE_IGNORED_PATH//\//\\/}\$" || true)"
+  if [[ -n "$ignored" ]]; then
+    log "Ignoring uncommitted changes to $RELEASE_IGNORED_PATH"
+  fi
+  if [[ -n "$dirty" ]]; then
+    err "ERROR: Uncommitted changes detected. Commit or stash before publishing:"
+    printf '%s\n' "$dirty" >&2
+    err "Pub rejects a dirty git tree (excluding $RELEASE_IGNORED_PATH)."
+    return 1
+  fi
 }
 
 changelog_version() {
@@ -134,7 +183,7 @@ check_versions() {
     return 1
   fi
 
-  echo "Version OK: $expected (CHANGELOG, pubspec.yaml, pubspec.wingify.yaml, constants.dart)"
+  log "Version OK: $expected (CHANGELOG, pubspec.yaml, pubspec.wingify.yaml, constants.dart)"
 }
 
 TARGET="${1:-}"
@@ -175,6 +224,11 @@ done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+log "Target package: $TARGET"
+
+if ! check_git_clean; then
+  exit 1
+fi
 
 if [[ -n "$CLI_VERSION" ]]; then
   EXPECTED="$CLI_VERSION"
@@ -196,39 +250,108 @@ fi
 if [[ "$TARGET" == "wingify" ]]; then
   SRC_PUBSPEC="pubspec.wingify.yaml"
   SRC_README="README_wingify.md"
+  EXPECTED_NAME="wingify_fme_flutter_sdk"
+  KEPT_PODSPEC="ios/wingify_fme_flutter_sdk.podspec"
+  IOS_PODSPEC_EXCLUDE="ios/vwo_fme_flutter_sdk.podspec"
 else
   SRC_PUBSPEC="pubspec.yaml"
   SRC_README="README.md"
+  EXPECTED_NAME="vwo_fme_flutter_sdk"
+  KEPT_PODSPEC="ios/vwo_fme_flutter_sdk.podspec"
+  IOS_PODSPEC_EXCLUDE="ios/wingify_fme_flutter_sdk.podspec"
 fi
 
-# Back up the working manifest/readme and restore them on exit.
-cp pubspec.yaml .pubspec.yaml.bak
-cp README.md .README.md.bak
+# Backups stay outside the repo so pub does not pack them or see them as untracked.
+BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fme-flutter-publish.XXXXXX")"
+
 restore() {
-  mv .pubspec.yaml.bak pubspec.yaml
-  mv .README.md.bak README.md
+  if [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]]; then
+    if [[ -f "$BACKUP_DIR/pubspec.yaml" ]]; then
+      cp "$BACKUP_DIR/pubspec.yaml" pubspec.yaml
+    fi
+    if [[ -f "$BACKUP_DIR/README.md" ]]; then
+      cp "$BACKUP_DIR/README.md" README.md
+    fi
+    if [[ -f "$BACKUP_DIR/pubignore" ]]; then
+      cp "$BACKUP_DIR/pubignore" .pubignore
+    fi
+    if [[ -n "${IOS_PODSPEC_EXCLUDE:-}" && -f "$BACKUP_DIR/excluded.podspec" && ! -e "$IOS_PODSPEC_EXCLUDE" ]]; then
+      mv "$BACKUP_DIR/excluded.podspec" "$IOS_PODSPEC_EXCLUDE"
+    fi
+    rm -rf "$BACKUP_DIR"
+    BACKUP_DIR=""
+  fi
+  if [[ ${#GIT_ASSUME_UNCHANGED[@]} -gt 0 ]]; then
+    git_restore_assume_unchanged
+  fi
 }
 trap restore EXIT
 
-# Materialize the chosen brand's manifest/readme (sourced from the backups so
-# reading and writing pubspec.yaml in-place is safe), dropping `publish_to`.
+git_assume_unchanged pubspec.yaml
+git_assume_unchanged README.md
+git_assume_unchanged .pubignore
+git_assume_unchanged "$RELEASE_IGNORED_PATH"
+git_assume_unchanged "$IOS_PODSPEC_EXCLUDE"
+
+cp pubspec.yaml "$BACKUP_DIR/pubspec.yaml"
+cp README.md "$BACKUP_DIR/README.md"
+cp .pubignore "$BACKUP_DIR/pubignore"
+
+if ! grep -qxF "$IOS_PODSPEC_EXCLUDE" .pubignore; then
+  printf '\n%s\n' "$IOS_PODSPEC_EXCLUDE" >> .pubignore
+fi
+
+if [[ -f "$IOS_PODSPEC_EXCLUDE" ]]; then
+  mv "$IOS_PODSPEC_EXCLUDE" "$BACKUP_DIR/excluded.podspec"
+fi
+
+log "Publishing $EXPECTED_NAME (keeping $KEPT_PODSPEC, excluding $IOS_PODSPEC_EXCLUDE)"
+
 if [[ "$TARGET" == "vwo" ]]; then
-  grep -v '^publish_to:' .pubspec.yaml.bak > pubspec.yaml
-  cp .README.md.bak README.md
+  grep -v '^publish_to:' "$BACKUP_DIR/pubspec.yaml" > pubspec.yaml
+  cp "$BACKUP_DIR/README.md" README.md
 else
   grep -v '^publish_to:' "$SRC_PUBSPEC" > pubspec.yaml
   cp "$SRC_README" README.md
 fi
 
+pubspec_name="$(sed -n 's/^name:[[:space:]]*//p' pubspec.yaml | head -1)"
+if [[ "$pubspec_name" != "$EXPECTED_NAME" ]]; then
+  err "ERROR: pubspec.yaml name is '$pubspec_name', expected '$EXPECTED_NAME'."
+  exit 1
+fi
+if grep -q '^publish_to:' pubspec.yaml; then
+  err "ERROR: publish_to is still set in pubspec.yaml."
+  exit 1
+fi
+if [[ ! -f "$KEPT_PODSPEC" ]]; then
+  err "ERROR: expected podspec $KEPT_PODSPEC is missing."
+  exit 1
+fi
+if [[ -e "$IOS_PODSPEC_EXCLUDE" ]]; then
+  err "ERROR: alternate podspec $IOS_PODSPEC_EXCLUDE is still in the tree."
+  exit 1
+fi
+
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+  dirty="$(git status --porcelain | grep -vE "(^|[[:space:]])${RELEASE_IGNORED_PATH//\//\\/}\$" || true)"
+  if [[ -n "$dirty" ]]; then
+    err "ERROR: git tree is dirty after preparing the package:"
+    printf '%s\n' "$dirty" >&2
+    exit 1
+  fi
+fi
+
 PUBLISH_CMD=(flutter pub publish)
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "Dry run: validating \"$TARGET\" package (no upload)." >&2
+  log "Dry run: validating \"$TARGET\" package (no upload)."
   PUBLISH_CMD+=(--dry-run)
 fi
 if [[ ${#PUBLISH_ARGS[@]} -gt 0 ]]; then
   PUBLISH_CMD+=("${PUBLISH_ARGS[@]}")
 fi
+log "Running: ${PUBLISH_CMD[*]}"
 "${PUBLISH_CMD[@]}"
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "Dry run passed." >&2
+  log "Dry run passed."
 fi

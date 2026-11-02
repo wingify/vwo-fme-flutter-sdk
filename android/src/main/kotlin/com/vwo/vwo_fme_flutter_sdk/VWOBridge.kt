@@ -74,6 +74,9 @@ class VWOBridge(private val context: Context) {
     /**
      * Builds a [WingifyUserContext] from the map sent by Flutter. Accepted by both the Wingify
      * and VWO native APIs.
+     *
+     * ipAddress is not copied. The Android user context has no IP field; iOS reads it
+     * for gateway user-details.
      */
     private fun buildUserContext(map: Map<*, *>): WingifyUserContext {
         return WingifyUserContext().apply {
@@ -83,6 +86,12 @@ class VWOBridge(private val context: Context) {
                 variationTargetingVariables.putAll(it)
             }
             shouldUseDeviceIdAsUserId = map["shouldUseDeviceIdAsUserId"] as? Boolean ?: false
+            // Non-empty seed replaces id for variation assignment. Native falls back to id otherwise.
+            (map["bucketingSeed"] as? String)?.let { bucketingSeed = it }
+            // customVariables keys that get applied after the variation is chosen.
+            (map["postSegmentationVariables"] as? List<*>)?.mapNotNull { it as? String }?.let {
+                postSegmentationVariables = it
+            }
             (map["gatewayService"] as? Map<*, *>)?.let { gateway ->
                 vwo = GatewayService().apply {
                     location = gateway["location"] as? Map<String, String>
@@ -115,6 +124,7 @@ class VWOBridge(private val context: Context) {
         val gatewayServiceMap = args["gatewayService"] as? Map<*, *>
         val pollInterval = (args["pollInterval"] as? Int) ?: 0
         val cachedSettingsExpiryTime = (args["cachedSettingsExpiryTime"] as? Int) ?: 0
+        val cachedDecisionExpiryTime = (args["cachedDecisionExpiryTime"] as? Int) ?: 0
         val batchMinSize = (args["batchMinSize"] as? Int) ?: -1
         val batchUploadTimeIntervalString = args["batchUploadTimeInterval"] as? String
         val batchUploadTimeInterval = batchUploadTimeIntervalString?.toLongOrNull() ?: -1L
@@ -123,6 +133,8 @@ class VWOBridge(private val context: Context) {
         val vwoMeta = args["_vwo_meta"] as? Map<String, Any> ?: mapOf()
         val hasIntegrations = args["hasIntegrations"] as? Boolean ?: false
         val isAliasingEnabled = args["isAliasingEnabled"] as? Boolean ?: false
+        val shouldTriggerIntegrationCallbackAlways =
+            args["shouldTriggerIntegrationCallbackAlways"] as? Boolean ?: false
         val useWingifyApi = args["useWingifyApi"] as? Boolean ?: false
 
         val initOptions: WingifyInitOptions =
@@ -153,6 +165,9 @@ class VWOBridge(private val context: Context) {
             if (cachedSettingsExpiryTime > 0) {
                 this.cachedSettingsExpiryTime = cachedSettingsExpiryTime
             }
+            // Unlike settings expiry, 0 is a real value: cached getFlag decisions never expire.
+            // Missing from Flutter is coerced to 0 above, so always write it.
+            this.cachedDecisionExpiryTime = cachedDecisionExpiryTime
             if (batchMinSize > 0) {
                 this.batchMinSize = batchMinSize
             }
@@ -165,6 +180,8 @@ class VWOBridge(private val context: Context) {
             this.isUsageStatsDisabled = isUsageStatsDisabled
             this._vwo_meta = vwoMeta
             this.isAliasingEnabled = isAliasingEnabled
+            // false: callback once per distinct payload. true: also when getFlag is a cache hit.
+            this.shouldTriggerIntegrationCallbackAlways = shouldTriggerIntegrationCallbackAlways
         }
 
         // Only set integrations if provided by the client
@@ -183,6 +200,9 @@ class VWOBridge(private val context: Context) {
         if (useWingifyApi) {
             Wingify.init(initOptions, object : IWingifyInitCallback {
                 override fun wingifyInitSuccess(wingify: Wingify, message: String) {
+                    // vwo_initCalled. Native skips it when this instance was already initialized.
+                    // Duration is not passed anymore; that lives on the usage-stats event.
+                    wingify.sendSdkInitEvent()
                     result.success("Wingify is ready to use.")
                 }
 
@@ -193,6 +213,8 @@ class VWOBridge(private val context: Context) {
         } else {
             VWO.init(initOptions as VWOInitOptions, object : IVwoInitCallback {
                 override fun vwoInitSuccess(vwo: VWO, message: String) {
+                    // vwo_initCalled after a fresh init. Skipped if this instance already initialized.
+                    vwo.sendSdkInitEvent()
                     result.success("VWO is ready to use.")
                 }
 
@@ -454,44 +476,6 @@ class VWOBridge(private val context: Context) {
             result.success(null)
         } else {
             result.error("INVALID_ARGUMENT", "Session data is null", null)
-        }
-    }
-
-    /**
-     * Sends the SDK initialization event with timing information.
-     */
-    fun sendSdkInitEvent(call: MethodCall, result: Result) {
-        try {
-            val args = call.arguments as? Map<*, *>
-            val accountId = args?.get("accountId") as? Int
-            val sdkKey = args?.get("sdkKey") as? String
-            val useWingifyApi = args?.get("useWingifyApi") as? Boolean ?: false
-
-            if (accountId == null || sdkKey == null) {
-                result.error("INVALID_ARGUMENTS", "Invalid accountId and sdkKey passed.", null)
-                return
-            }
-
-            val sdkInitTimeStr = args["sdkInitTime"] as? String
-            if (sdkInitTimeStr == null) {
-                result.error("INVALID_ARGUMENTS", "sdkInitTime is required", null)
-                return
-            }
-
-            val sdkInitTime = sdkInitTimeStr.toLongOrNull()
-            if (sdkInitTime == null) {
-                result.error("INVALID_ARGUMENTS", "sdkInitTime must be a valid number", null)
-                return
-            }
-
-            getClient(accountId, sdkKey, useWingifyApi)?.sendSdkInitEvent(sdkInitTime)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error(
-                "SEND_SDK_INIT_EVENT_ERROR",
-                "Error while sending SDK init event: ${e.message}",
-                e.stackTraceToString()
-            )
         }
     }
 

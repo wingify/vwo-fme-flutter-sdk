@@ -1,0 +1,238 @@
+# Manual publish to pub.dev. Same shape as the Android Maven Central workflow
+# (artifact choice, tests, version gate, GitHub release, Slack), with the
+# pub.dev constraints that workflow does not have:
+#
+#   * Run this workflow FROM the tag (GitHub "Use workflow from" = vX.Y.Z).
+#     pub.dev rejects a token whose refType is not "tag". Dispatching from
+#     master and checking the tag out does not count.
+#   * On each package's pub.dev Admin → Automated publishing:
+#       repository: wingify/vwo-fme-flutter-sdk
+#       tag pattern: v{{version}}     (same pattern on BOTH packages; they
+#                                      share one version and one tag)
+#       events: workflow_dispatch      (push is unused)
+#       environment, if required: release
+#   * No pub token secret. dart-lang/setup-dart writes an OIDC token
+#     (permissions: id-token: write). Flutter 3.7.12 is required because
+#     pubspec sdk is >=2.19.0 <3.0.0.
+#
+# GitHub secret: SLACK_NOTIFICATIONS_BOT_TOKEN (optional when skip_slack is true)
+# GitHub environment: release (create it; add reviewers if you want a gate)
+#
+# tool/publish.sh swaps the brand manifest and leaves a single iOS podspec.
+# "both" publishes vwo, then wingify. A wingify failure does not roll back vwo.
+name: pub.dev Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Which package to publish'
+        type: choice
+        options:
+          - both
+          - vwo
+          - wingify
+        default: both
+      skip_tests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
+      skip_slack:
+        description: 'Proceed without Slack bot token'
+        type: boolean
+        default: false
+
+concurrency:
+  group: pub-dev-release
+  cancel-in-progress: false
+
+jobs:
+  # A skipped release job still marks the run successful. Fail loudly when
+  # someone dispatches from a branch: pub.dev rejects that token.
+  ref-check:
+    name: Require a version tag
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject branch ref
+        run: |
+          echo "::error::Run this workflow from the version tag (Use workflow from: vX.Y.Z), not from ${GITHUB_REF}. pub.dev only accepts a tag ref."
+          exit 1
+
+  release:
+    name: Publish ${{ github.event.inputs.artifact || 'both' }}
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          TAG="${TAG#refs/tags/}"
+          VERSION="${TAG#v}"
+          CHANGELOG="$(sed -n 's/^## \[\([^]]*\)\].*/\1/p' CHANGELOG.md | head -1)"
+          PUBSPEC_VWO="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)"
+          PUBSPEC_WINGIFY="$(sed -n 's/^version:[[:space:]]*//p' pubspec.wingify.yaml | head -1)"
+          CONSTANTS="$(sed -n 's/^const sdkVersion = "\([^"]*\)";/\1/p' lib/utils/constants.dart | head -1)"
+          ARTIFACT="${{ github.event.inputs.artifact || 'both' }}"
+
+          echo "ref=${GITHUB_REF} ref_type=${GITHUB_REF_TYPE}"
+          echo "tag=${TAG}"
+          echo "CHANGELOG.md=${CHANGELOG}"
+          echo "pubspec.yaml=${PUBSPEC_VWO}"
+          echo "pubspec.wingify.yaml=${PUBSPEC_WINGIFY}"
+          echo "constants.dart=${CONSTANTS}"
+          echo "artifact=${ARTIFACT}"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Run this workflow from a vX.Y.Z tag. Got ref ${GITHUB_REF}."
+            exit 1
+          fi
+          if [ "$VERSION" != "$CHANGELOG" ] || [ "$VERSION" != "$PUBSPEC_VWO" ] || [ "$VERSION" != "$PUBSPEC_WINGIFY" ] || [ "$VERSION" != "$CONSTANTS" ]; then
+            echo "::error::Tag ${VERSION} does not match CHANGELOG=${CHANGELOG} pubspec=${PUBSPEC_VWO} wingify=${PUBSPEC_WINGIFY} constants=${CONSTANTS}"
+            exit 1
+          fi
+
+          git fetch origin master
+          if ! git merge-base --is-ancestor HEAD origin/master; then
+            echo "::error::Tag ${TAG} is not on origin/master."
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+
+      - name: Check secrets
+        id: secrets
+        if: always()
+        env:
+          SLACK_NOTIFICATIONS_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_BOT_TOKEN }}
+          SKIP_SLACK: ${{ github.event.inputs.skip_slack }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SLACK_NOTIFICATIONS_BOT_TOKEN}" ]; then
+            echo "slack_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "slack_ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "${SLACK_NOTIFICATIONS_BOT_TOKEN}" ] && [ "${SKIP_SLACK}" = "true" ]; then
+            echo "Slack bot token not set; continuing (skip_slack=true)."
+            exit 0
+          fi
+          missing=""
+          for v in SLACK_NOTIFICATIONS_BOT_TOKEN; do
+            if [ -z "${!v}" ]; then
+              missing="${missing:+$missing }$v"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "missing=$missing" >> "$GITHUB_OUTPUT"
+            echo "::error::Missing required secrets: $missing"
+            exit 1
+          fi
+
+      # setup-dart provisions the pub.dev OIDC token. Flutter is installed
+      # after it and shadows `dart` on PATH; the token file stays in place.
+      # ubuntu-22.04: Flutter 3.7.12 does not run on the current ubuntu-latest.
+      - name: Set up Dart (pub.dev OIDC token)
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '2.19.6'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.7.12'
+          cache: true
+
+      - name: Check Flutter SDK
+        run: |
+          set -euo pipefail
+          flutter --version
+          dart_version="$(flutter --version | sed -n 's/.*Dart \([0-9.]*\).*/\1/p' | head -1)"
+          echo "flutter dart=${dart_version}"
+          case "$dart_version" in
+            2.19.*) ;;
+            *)
+              echo "::error::Need Flutter's Dart 2.19.x (pubspec sdk is <3.0.0). Got ${dart_version:-unknown}."
+              exit 1
+              ;;
+          esac
+
+      - name: Unit tests
+        id: unit-tests
+        if: github.event.inputs.skip_tests != 'true'
+        run: flutter test
+
+      - name: Publish
+        if: success() && steps.secrets.outcome == 'success' && (github.event.inputs.skip_tests == 'true' || steps.unit-tests.outcome == 'success')
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARTIFACT: ${{ steps.meta.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          chmod +x tool/publish.sh
+          publish_one() {
+            tool/publish.sh "$1" --version "$VERSION" -- --force
+          }
+          case "$ARTIFACT" in
+            vwo) publish_one vwo ;;
+            wingify) publish_one wingify ;;
+            *) publish_one vwo; publish_one wingify ;;
+          esac
+
+      - name: GitHub release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARTIFACT: ${{ steps.meta.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          case "$ARTIFACT" in
+            vwo) TITLE="[VWO] ${TAG}" ;;
+            wingify) TITLE="[Wingify] ${TAG}" ;;
+            *) TITLE="${TAG}" ;;
+          esac
+          EXISTING="$(gh release view --json tagName --jq .tagName 2>/dev/null || true)"
+          echo "latest=${EXISTING:-<none>} tag=${TAG} title=${TITLE}"
+          if [ "${EXISTING#v}" = "$VERSION" ]; then
+            echo "Latest GitHub release already matches ${TAG}. Skipping."
+            exit 0
+          fi
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { capture=1 }
+            capture && seen && /^## \[/ { exit }
+            capture { print; seen=1 }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for ${VERSION}"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md
+          else
+            gh release create "$TAG" --title "$TITLE" --notes-file notes.md --verify-tag
+          fi
+
+      - name: Notification
+        if: always() && steps.secrets.outputs.slack_ok == 'true'
+        uses: wingify/slack-github-action@v1.15.1-wingify
+        with:
+          channel-id: 'vwo-fs-fme-sdk-job-status'
+          slack-message: "${{ job.status == 'success' && format('<!here> :rocket: *Flutter FME {0}*\n{1}\n<https://pub.dev/packages/vwo_fme_flutter_sdk|VWO on pub.dev>  ·  <https://pub.dev/packages/wingify_fme_flutter_sdk|Wingify on pub.dev>  ·  <https://github.com/{2}/releases/latest|Latest release>  ·  <https://github.com/{2}/actions/runs/{3}|View run>', steps.meta.outputs.version || github.ref_name, steps.meta.outputs.artifact == 'vwo' && '*VWO* published to pub.dev.' || steps.meta.outputs.artifact == 'wingify' && '*Wingify* published to pub.dev.' || '*VWO* & *Wingify* both published to pub.dev.', github.repository, github.run_id) || format('<!here> Flutter FME pub.dev release *{0}* ({1}) failed :x:{2}\nhttps://github.com/{3}/actions/runs/{4}', steps.meta.outputs.version || github.ref_name, steps.meta.outputs.artifact || github.event.inputs.artifact || 'both', steps.secrets.outputs.missing && format('\nMissing secrets: `{0}`', steps.secrets.outputs.missing) || '', github.repository, github.run_id) }}"
+          color: "${{ job.status == 'success' && '#00FF00' || '#FF0000' }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_BOT_TOKEN }}

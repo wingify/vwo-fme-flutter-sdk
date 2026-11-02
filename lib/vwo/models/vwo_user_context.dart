@@ -21,6 +21,9 @@ class VWOUserContext extends WingifyUserContext {
     super.id,
     super.customVariables,
     super.shouldUseDeviceIdAsUserId = false,
+    super.bucketingSeed,
+    super.postSegmentationVariables,
+    super.ipAddress,
   });
 
   @override
@@ -28,6 +31,9 @@ class VWOUserContext extends WingifyUserContext {
     return 'VWOUserContext('
         'userId: $id, '
         'customVariables: $customVariables, '
-        'shouldUseDeviceIdAsUserId: $shouldUseDeviceIdAsUserId)';
+        'shouldUseDeviceIdAsUserId: $shouldUseDeviceIdAsUserId, '
+        'bucketingSeed: $bucketingSeed, '
+        'postSegmentationVariables: $postSegmentationVariables, '
+        'ipAddress: $ipAddress)';
   }
 }

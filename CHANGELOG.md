@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.60.0] - 2026-10-29
+
+### Added
+
+- The SDK now sends sampled internal usage and debug events to VWO servers to reduce unnecessary network traffic.
+- Added `cachedDecisionExpiryTime` init option so cached `getFlag` decisions expire after the configured interval (milliseconds; `0` = never expire).
+- Added `shouldTriggerIntegrationCallbackAlways` init option to fire the integration callback on every evaluation, including cached decisions.
+- Added `bucketingSeed` on user context for custom bucketing (same seed yields a consistent decision across users/evaluations).
+- Added `ipAddress` on user context for gateway user-details (sent when a gateway is configured; iOS native support).
+- Added `postSegmentationVariables` on user context for keys from `customVariables` applied as post-segmentation attributes.
+
+```dart
+final options = VWOInitOptions(
+  sdkKey: SDK_KEY,
+  accountId: ACCOUNT_ID,
+  cachedDecisionExpiryTime: 60000,
+  shouldTriggerIntegrationCallbackAlways: true,
+);
+
+final userContext = VWOUserContext(
+  id: 'user_123',
+  customVariables: {'plan': 'premium', 'country': 'US'},
+  postSegmentationVariables: ['plan', 'country'],
+  bucketingSeed: 'stable-seed-123',
+  ipAddress: '1.2.3.4',
+);
+```
+
+### Fixed
+
+- Integration callback is now invoked on every API evaluation call on iOS, including when a variation or decision is served from local storage.
+- Restored logger `prefix` support on Android. The `logger.prefix` init option is now applied to log messages.
+- Updated ProGuard rules for hybrid (Flutter) SDK builds on Android.
+
+### Improved
+
+- Optimized event batching so `batchMinSize` and `batchUploadTimeInterval` are applied reliably during SDK initialization, including in multi-instance setups.
+- Improved SDK stability on iOS so that low device storage no longer causes the app to crash on startup. The SDK now continues to work safely in such cases.
+
+### Changed
+
+- Updated gateway user details request context handling to include `ipAddress` only when gateway configuration is present in init options.
+
 ## [1.56.0] - 2026-10-21
 
 ### Added

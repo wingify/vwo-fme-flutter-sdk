@@ -59,11 +59,10 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(log, hasLength(2));
+        expect(log, hasLength(1));
         expect(log.first.method, equals('init'));
         expect(log.first.arguments['sdkKey'], equals('test_sdk_key'));
         expect(log.first.arguments['accountId'], equals(12345));
-        expect(log[1].method, equals('sendSdkInitEvent'));
       });
 
       test('should throw error for empty sdkKey', () async {
@@ -131,9 +130,8 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(log, hasLength(2));
+        expect(log, hasLength(1));
         expect(log.first.arguments['logger'], isNotNull);
-        expect(log[1].method, equals('sendSdkInitEvent'));
       });
 
       test('should handle initialization with gateway service', () async {
@@ -153,9 +151,8 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(log, hasLength(2));
+        expect(log, hasLength(1));
         expect(log.first.arguments['gatewayService'], isNotNull);
-        expect(log[1].method, equals('sendSdkInitEvent'));
       });
 
       test('should handle initialization with all optional parameters',
@@ -166,9 +163,11 @@ void main() {
           accountId: 12345,
           pollInterval: 30,
           cachedSettingsExpiryTime: 3600,
+          cachedDecisionExpiryTime: 60000,
           batchMinSize: 10,
           batchUploadTimeInterval: 5000,
           isUsageStatsDisabled: true,
+          shouldTriggerIntegrationCallbackAlways: true,
         );
 
         // Act
@@ -176,14 +175,15 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(log, hasLength(2));
+        expect(log, hasLength(1));
         final args = log.first.arguments;
         expect(args['pollInterval'], equals(30));
         expect(args['cachedSettingsExpiryTime'], equals(3600));
+        expect(args['cachedDecisionExpiryTime'], equals(60000));
         expect(args['batchMinSize'], equals(10));
         expect(args['batchUploadTimeInterval'], equals('5000'));
         expect(args['isUsageStatsDisabled'], equals(true));
-        expect(log[1].method, equals('sendSdkInitEvent'));
+        expect(args['shouldTriggerIntegrationCallbackAlways'], equals(true));
       });
     });
 
@@ -215,7 +215,7 @@ void main() {
         expect(result, isNotNull);
         expect(result!.isEnabled(), isTrue);
         expect(result.getVariables(), hasLength(1));
-        expect(log, hasLength(3)); // init + sendSdkInitEvent + getFlag
+        expect(log, hasLength(2)); // init + getFlag
         expect(log.last.method, equals('getFlag'));
         expect(log.last.arguments['flagName'], equals('test_feature'));
       });

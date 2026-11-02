@@ -22,10 +22,23 @@ class WingifyUserContext implements FmeUserContext {
   final Map<String, dynamic>? customVariables;
   final bool shouldUseDeviceIdAsUserId;
 
+  /// Bucketing key. When this is set, native ignores [id] for variation assignment.
+  /// Null or empty falls back to [id]. A shared seed puts different users on the same variation.
+  final String? bucketingSeed;
+
+  /// Names of entries in [customVariables] that are applied after the variation is chosen.
+  final List<String>? postSegmentationVariables;
+
+  /// User IP for gateway user-details. Only used when a gateway was set at init, and only on iOS.
+  final String? ipAddress;
+
   WingifyUserContext({
     this.id,
     this.customVariables,
     this.shouldUseDeviceIdAsUserId = false,
+    this.bucketingSeed,
+    this.postSegmentationVariables,
+    this.ipAddress,
   });
 
   /// Converts the `WingifyUserContext` object into a Map.
@@ -35,6 +48,9 @@ class WingifyUserContext implements FmeUserContext {
       'id': id,
       'customVariables': customVariables,
       'shouldUseDeviceIdAsUserId': shouldUseDeviceIdAsUserId,
+      'bucketingSeed': bucketingSeed,
+      'postSegmentationVariables': postSegmentationVariables,
+      'ipAddress': ipAddress,
     };
   }
 
@@ -43,6 +59,9 @@ class WingifyUserContext implements FmeUserContext {
     return 'WingifyUserContext('
         'userId: $id, '
         'customVariables: $customVariables, '
-        'shouldUseDeviceIdAsUserId: $shouldUseDeviceIdAsUserId)';
+        'shouldUseDeviceIdAsUserId: $shouldUseDeviceIdAsUserId, '
+        'bucketingSeed: $bucketingSeed, '
+        'postSegmentationVariables: $postSegmentationVariables, '
+        'ipAddress: $ipAddress)';
   }
 }

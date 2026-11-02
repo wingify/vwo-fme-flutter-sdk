@@ -25,5 +25,4 @@ object VWOConstants {
     const val ANDROID_SET_ALIAS = "setAlias"
     const val ANDROID_CLEAR_INSTANCE = "clearInstance"
     const val ANDROID_SET_SESSION = "setSessionData"
-    const val ANDROID_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 }

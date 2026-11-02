@@ -15,7 +15,7 @@ Wingify is a server-side solution where you integrate Wingify's SDK in your serv
   s.source           = { :path => '.' }
   s.source_files = 'vwo_fme_flutter_sdk/Sources/vwo_fme_flutter_sdk/**/*'
   s.dependency 'Flutter'
-  s.dependency 'Wingify-FME','1.55.0'
+  s.dependency 'Wingify-FME','1.68.0'
   s.platform = :ios, '12.0'
 
   # Flutter.framework does not contain a i386 slice.

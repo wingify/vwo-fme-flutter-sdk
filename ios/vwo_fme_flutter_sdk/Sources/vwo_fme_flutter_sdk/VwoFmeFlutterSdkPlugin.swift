@@ -37,7 +37,6 @@ private let IOS_SET_ATTRIBUTE = "setAttribute"
 private let IOS_SET_ALIAS = "setAlias"
 private let IOS_CLEAR_INSTANCE = "clearInstance"
 private let IOS_SET_SESSION = "setSessionData"
-private let IOS_SEND_SDK_INIT_EVENT = "sendSdkInitEvent"
 
 /// The FME Flutter SDK plugin for iOS.
 ///
@@ -72,16 +71,27 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         return WingifyFme.getInstance(accountId: accountId, sdkKey: sdkKey)
     }
 
+    // Flutter user map -> native context.
+    // bucketingSeed, when set, is what gets bucketed (id is the fallback).
+    // postSegmentationVariables are customVariable keys applied after that.
+    // ipAddress is only read when a gateway was configured at init.
     private func vwoContext(_ dict: [String: Any]) -> VWOUserContext {
         return VWOUserContext(id: dict["id"] as? String,
                               shouldUseDeviceIdAsUserId: dict["shouldUseDeviceIdAsUserId"] as? Bool ?? false,
-                              customVariables: dict["customVariables"] as? [String: Any] ?? [:])
+                              customVariables: dict["customVariables"] as? [String: Any] ?? [:],
+                              postSegmentationVariables: dict["postSegmentationVariables"] as? [String],
+                              bucketingSeed: dict["bucketingSeed"] as? String,
+                              ipAddress: dict["ipAddress"] as? String)
     }
 
+    // Same mapping as vwoContext, for the Wingify client.
     private func wingifyContext(_ dict: [String: Any]) -> WingifyUserContext {
         return WingifyUserContext(id: dict["id"] as? String,
                                   shouldUseDeviceIdAsUserId: dict["shouldUseDeviceIdAsUserId"] as? Bool ?? false,
-                                  customVariables: dict["customVariables"] as? [String: Any] ?? [:])
+                                  customVariables: dict["customVariables"] as? [String: Any] ?? [:],
+                                  postSegmentationVariables: dict["postSegmentationVariables"] as? [String],
+                                  bucketingSeed: dict["bucketingSeed"] as? String,
+                                  ipAddress: dict["ipAddress"] as? String)
     }
 
     /// Registers the plugin with the Flutter framework.
@@ -118,8 +128,6 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             clearInstance(call, result: result)
         case IOS_SET_SESSION:
             setSessionData(call, result: result)
-        case IOS_SEND_SDK_INIT_EVENT:
-            sendSdkInitEvent(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -142,12 +150,17 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let gatewayService = args["gatewayService"] as? [String: Any]
         let pollInterval: Int64? = args["pollInterval"] as? Int64 ?? nil
         let cachedSettingsExpiryTime: Int64? = args["cachedSettingsExpiryTime"] as? Int64 ?? nil
+        // nil or 0: cached getFlag decisions do not expire.
+        let cachedDecisionExpiryTime: Int64? = args["cachedDecisionExpiryTime"] as? Int64 ?? nil
         let batchMinSize = args["batchMinSize"] as? Int ?? nil
         let sdkVersion = args["sdkVersion"] as? String ?? ""
         let isUsageStatsDisabled = args["isUsageStatsDisabled"] as? Bool ?? false
         let vwoMeta = args["_vwo_meta"] as? [String: Any] ?? [:]
         let hasIntegrations = args["hasIntegrations"] as? Bool ?? false
         let isAliasingEnabled = args["isAliasingEnabled"] as? Bool ?? false
+        // Off by default. On means the integration callback also runs for cache hits.
+        let shouldTriggerIntegrationCallbackAlways =
+            args["shouldTriggerIntegrationCallbackAlways"] as? Bool ?? false
         let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
 
         var batchUploadTimeInterval: Int64 = -1
@@ -178,6 +191,15 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
         let completion: WingifyInitCompletionHandler = { initResult in
             switch initResult {
             case .success(let message):
+                // Native still requires sdkInitTime but ignores the value (usage stats carry timing).
+                // 0 is intentional. The event is also skipped if this instance already initialized.
+                if useWingifyApi {
+                    self.getWingifyInstance(accountId: accountId, sdkKey: sdkKey)?
+                        .sendSdkInitEvent(sdkInitTime: 0)
+                } else {
+                    self.getVWOInstance(accountId: accountId, sdkKey: sdkKey)?
+                        .sendSdkInitEvent(sdkInitTime: 0)
+                }
                 result(message)
             case .failure(let error):
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
@@ -192,6 +214,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                              integrations: integrations,
                                              gatewayService: gatewayService ?? [:],
                                              cachedSettingsExpiryTime: cachedSettingsExpiryTime,
+                                             cachedDecisionExpiryTime: cachedDecisionExpiryTime,
                                              pollInterval: pollInterval,
                                              batchMinSize: resolvedBatchMinSize,
                                              batchUploadTimeInterval: resolvedBatchInterval,
@@ -201,7 +224,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                              isUsageStatsDisabled: isUsageStatsDisabled,
                                              vwoMeta: vwoMeta,
                                              storage: nil,
-                                             isAliasingEnabled: isAliasingEnabled)
+                                             isAliasingEnabled: isAliasingEnabled,
+                                             shouldTriggerIntegrationCallbackAlways: shouldTriggerIntegrationCallbackAlways)
             WingifyFme.initialize(options: options, completion: completion)
         } else {
             let options = VWOInitOptions(sdkKey: sdkKey,
@@ -211,6 +235,7 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                          integrations: integrations,
                                          gatewayService: gatewayService ?? [:],
                                          cachedSettingsExpiryTime: cachedSettingsExpiryTime,
+                                         cachedDecisionExpiryTime: cachedDecisionExpiryTime,
                                          pollInterval: pollInterval,
                                          batchMinSize: resolvedBatchMinSize,
                                          batchUploadTimeInterval: resolvedBatchInterval,
@@ -220,7 +245,8 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
                                          isUsageStatsDisabled: isUsageStatsDisabled,
                                          vwoMeta: vwoMeta,
                                          storage: nil,
-                                         isAliasingEnabled: isAliasingEnabled)
+                                         isAliasingEnabled: isAliasingEnabled,
+                                         shouldTriggerIntegrationCallbackAlways: shouldTriggerIntegrationCallbackAlways)
             VWOFme.initialize(options: options, completion: completion)
         }
     }
@@ -424,31 +450,5 @@ public class VwoFmeFlutterSdkPlugin: NSObject, FlutterPlugin, IntegrationCallbac
             message: "Session data is null",
             details: nil))
         }
-    }
-
-    /// Sends SDK initialization event with timing information.
-    ///
-    /// - Parameters:
-    /// - call: The method call.
-    /// - result: The result callback.
-    private func sendSdkInitEvent(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let sdkInitTimeStr = args["sdkInitTime"] as? String,
-              let sdkInitTime = Int64(sdkInitTimeStr) else {
-            result(FlutterError(code: "INVALID_ARGUMENTS", message: "sdkInitTime is required and must be a valid number", details: nil))
-            return
-        }
-
-        let accountId = args["accountId"] as? Int
-        let sdkKey = args["sdkKey"] as? String
-        let useWingifyApi = args["useWingifyApi"] as? Bool ?? false
-
-        if useWingifyApi {
-            getWingifyInstance(accountId: accountId, sdkKey: sdkKey)?.sendSdkInitEvent(sdkInitTime: sdkInitTime)
-        } else {
-            getVWOInstance(accountId: accountId, sdkKey: sdkKey)?.sendSdkInitEvent(sdkInitTime: sdkInitTime)
-        }
-
-        result(true)
     }
 }

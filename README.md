@@ -113,8 +113,10 @@ To customize the SDK further, additional parameters can be passed to the `init()
 | `sdkKey`                   | SDK key corresponding to the specific environment to initialize the VWO SDK Client. You can get this key from VWO Application.                              | Yes          | String   | `'32-alpha-numeric-sdk-key'`    |
 | `pollInterval`             | Time interval for fetching updates from VWO servers (in milliseconds).                                                                                      | No           | Integer  | `60000`                         |
 | `cachedSettingsExpiryTime` | Controls the duration (in milliseconds) the SDK uses cached settings before fetching new ones.                                                              | No           | Integer  | `60000`                         |
+| `cachedDecisionExpiryTime` | Expiry time for cached `getFlag` decisions in milliseconds. `0` means decisions never expire.                                                              | No           | Integer  | `60000`                         |
 | `batchMinSize`             | Uploads are triggered when the batch reaches this minimum size.                                                                                             | No           | Integer  | `10`                            |
 | `batchUploadTimeInterval`  | Specifies the time interval (in milliseconds) for periodic batch uploads.                                                                                   | No           | Integer  | `60000`                         |
+| `shouldTriggerIntegrationCallbackAlways` | When `true`, integration callback fires on every evaluation (including cached decisions). Default (`false`) fires once per unique payload.      | No           | Boolean  | `false`                        |
 | `logger`                   | Custom logger configuration for controlling log levels and implementing custom logging behavior.                                                             | No           | Object   | See [Logger](#logger) section   |
 
 ### User Context
@@ -130,6 +132,9 @@ The following table explains all the parameters in the `context` object:
 | `id`              | Unique identifier for the user. Can be null if shouldUseDeviceIdAsUserId is true. | No           | String?  | `'unique_user_id'`                |
 | `customVariables` | Custom attributes for targeting.                                           | No           | Object   | `{ age: 25, location: 'US' }`     |
 | `shouldUseDeviceIdAsUserId` | When set to true, uses device ID as user ID when userId is not provided. Defaults to false. | No | Boolean | `true` |
+| `bucketingSeed`   | Seed used for bucketing instead of `id`. Falls back to `id` if `null` or empty. | No           | String   | `'household-123'`                 |
+| `postSegmentationVariables` | Keys from `customVariables` applied as post-segmentation attributes. | No           | List<String> | `['plan', 'country']`             |
+| `ipAddress`       | User IP for gateway user-details (sent when gateway is configured). iOS.   | No           | String   | `'1.2.3.4'`                       |
 
 #### Example
 
@@ -138,8 +143,11 @@ final userContext = VWOUserContext(
     id: USER_ID,
     customVariables: {
         "age": 25,
-        "location": "US"
+        "location": "US",
+        "plan": "premium"
     },
+    postSegmentationVariables: ["plan", "location"],
+    bucketingSeed: "stable-seed-123",
     shouldUseDeviceIdAsUserId: false, // Set to true to use device ID as user ID when userId is not provided
 );
 
@@ -151,6 +159,87 @@ final userContextWithDeviceId = VWOUserContext(
     },
     shouldUseDeviceIdAsUserId: true, // Set to true to use device ID as user ID when userId is not provided, this is false by default and need not be passed if not required
 );
+```
+
+### Custom Bucketing Seed
+
+`bucketingSeed` on `VWOUserContext` keeps feature-flag decisions consistent across different users. When a seed is set, the SDK buckets on that seed instead of the user ID, so users who share a seed land on the same variation.
+
+Common uses:
+
+- Household or account-level consistency — everyone on the same account gets the same experience.
+- Cross-device consistency — the same logical identity resolves to the same variation even when each device has its own user ID.
+
+#### Behavior
+
+- A non-null, non-empty `bucketingSeed` takes priority over `id` for bucketing.
+- `null` or `""` falls back to `id`.
+- Forced variations (whitelisted users) still take precedence over the seed.
+
+Example usage:
+
+```dart
+// Two different users sharing the same seed receive the same variation
+final alice = VWOUserContext(
+  id: 'user_alice',
+  bucketingSeed: 'household-123',
+);
+final bob = VWOUserContext(
+  id: 'user_bob',
+  bucketingSeed: 'household-123',
+);
+
+final aliceFlag = await vwoClient?.getFlag(
+  featureKey: 'feature_key',
+  context: alice,
+);
+final bobFlag = await vwoClient?.getFlag(
+  featureKey: 'feature_key',
+  context: bob,
+);
+// aliceFlag and bobFlag resolve to the same variation
+```
+
+### Cached Decision Expiry
+
+`cachedDecisionExpiryTime` on `VWOInitOptions` sets how long a stored `getFlag` decision stays valid, in milliseconds. After it expires, the next `getFlag` call evaluates the flag again. Omit the option, or set it to `0`, and cached decisions never expire.
+
+#### Behavior
+
+- The value is in milliseconds.
+- `0` or omitted: stored decisions never expire.
+- A positive value: `getFlag` reuses the stored decision until that interval elapses, then evaluates again.
+
+Example usage:
+
+```dart
+final options = VWOInitOptions(
+  sdkKey: SDK_KEY,
+  accountId: ACCOUNT_ID,
+  cachedDecisionExpiryTime: 60000, // 1 minute
+);
+final vwoClient = await VWO.init(options);
+
+final context = VWOUserContext(id: 'user_123');
+final flag = await vwoClient?.getFlag(
+  featureKey: 'feature_key',
+  context: context,
+);
+// Calls within 1 minute reuse this decision.
+// After 1 minute, the next getFlag evaluates again.
+```
+
+### Always Trigger Integration Callback
+
+When `shouldTriggerIntegrationCallbackAlways` is `true`, the integration callback runs on every evaluation, including decisions served from cache.
+
+```dart
+final options = VWOInitOptions(
+  sdkKey: SDK_KEY,
+  accountId: ACCOUNT_ID,
+  shouldTriggerIntegrationCallbackAlways: true,
+);
+final vwoClient = await VWO.init(options);
 ```
 
 ### Basic Feature Flagging

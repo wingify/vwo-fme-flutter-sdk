@@ -18,10 +18,12 @@ void main() {
       expect(options.gatewayService, isNull);
       expect(options.pollInterval, isNull);
       expect(options.cachedSettingsExpiryTime, isNull);
+      expect(options.cachedDecisionExpiryTime, isNull);
       expect(options.integrations, isNull);
       expect(options.batchMinSize, equals(-1));
       expect(options.batchUploadTimeInterval, equals(-1));
       expect(options.isUsageStatsDisabled, isFalse);
+      expect(options.shouldTriggerIntegrationCallbackAlways, isFalse);
       expect(options.vwo_meta, isEmpty);
     });
 
@@ -39,10 +41,13 @@ void main() {
         gatewayService: gatewayService,
         pollInterval: 30000,
         cachedSettingsExpiryTime: 60000,
+        cachedDecisionExpiryTime: 60000,
         integrations: integrations,
         batchMinSize: 10,
         batchUploadTimeInterval: 120000,
         isUsageStatsDisabled: true,
+        isAliasingEnabled: true,
+        shouldTriggerIntegrationCallbackAlways: true,
       );
 
       // Assert
@@ -52,10 +57,13 @@ void main() {
       expect(options.gatewayService, equals(gatewayService));
       expect(options.pollInterval, equals(30000));
       expect(options.cachedSettingsExpiryTime, equals(60000));
+      expect(options.cachedDecisionExpiryTime, equals(60000));
       expect(options.integrations, equals(integrations));
       expect(options.batchMinSize, equals(10));
       expect(options.batchUploadTimeInterval, equals(120000));
       expect(options.isUsageStatsDisabled, isTrue);
+      expect(options.isAliasingEnabled, isTrue);
+      expect(options.shouldTriggerIntegrationCallbackAlways, isTrue);
     });
 
     test('should allow modification of vwo_meta', () {

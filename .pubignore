@@ -58,3 +58,7 @@ coverage/
 # Alternate-brand publishing artifacts (not for pub.dev)
 pubspec.wingify.yaml
 README_wingify.md
+tool/publish.sh
+
+# Release automation (not part of the SDK package)
+.github/

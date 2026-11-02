@@ -57,9 +57,6 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
   /// or error if the initialization fails.
   static Future<MethodChannelVwoFmeFlutterSdk?> init(
       FmeInitOptions options) async {
-    // Record the start time for measuring initialization duration
-    final initStartTime = DateTime.now().millisecondsSinceEpoch;
-
     // Validate required parameters
     if (options.sdkKey.isEmpty) {
       return Future.error(
@@ -74,6 +71,8 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
 
     Map<String, dynamic> stats = await UsageStats(options).getStats();
 
+    // Passed straight through to native init. We no longer measure init time here
+    // or call sendSdkInitEvent; Android/iOS fire vwo_initCalled from the success callback.
     final parameters = {
       'sdkKey': options.sdkKey,
       'accountId': options.accountId,
@@ -81,12 +80,15 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
       'gatewayService': options.gatewayService,
       'pollInterval': options.pollInterval,
       'cachedSettingsExpiryTime': options.cachedSettingsExpiryTime,
+      'cachedDecisionExpiryTime': options.cachedDecisionExpiryTime,
       'batchMinSize': options.batchMinSize,
       'batchUploadTimeInterval': "${options.batchUploadTimeInterval}",
       '_vwo_meta': stats,
       'sdkVersion': sdkVersion,
       'isUsageStatsDisabled': options.isUsageStatsDisabled,
       'isAliasingEnabled': options.isAliasingEnabled,
+      'shouldTriggerIntegrationCallbackAlways':
+          options.shouldTriggerIntegrationCallbackAlways,
       'hasIntegrations': options.integrations != null,
       'useWingifyApi': options.useWingifyApi
     };
@@ -102,18 +104,6 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     flutterSdk._transports = transportsCopy;
 
     await methodChannel.invokeMethod('init', parameters);
-
-    // Calculate initialization time and send to native SDK
-    final initEndTime = DateTime.now().millisecondsSinceEpoch;
-    final sdkInitTime = initEndTime - initStartTime;
-
-    // Send SDK initialization event with timing information
-    try {
-      await flutterSdk.sendSdkInitEvent(
-          sdkInitTime, options.accountId, options.sdkKey);
-    } catch (e) {
-      // Best-effort telemetry; init must not fail if this event can't be sent.
-    }
 
     return flutterSdk;
   }
@@ -367,31 +357,6 @@ class MethodChannelVwoFmeFlutterSdk extends VwoFmeFlutterSdkPlatform {
     try {
       return await methodChannel.invokeMethod('setSessionData', sessionData) ??
           false;
-    } on PlatformException catch (e) {
-      // Handle errors from the native side
-      throw Exception("Error: ${e.code}, ${e.message}");
-    }
-  }
-
-  /// Sends SDK initialization event with timing information.
-  ///
-  /// [sdkInitTime] The time taken for SDK initialization in milliseconds.
-  ///
-  /// Returns a [Future] that resolves to a boolean indicating the success status of sending the event.
-  @override
-  Future<bool> sendSdkInitEvent(
-      int sdkInitTime, int? accountId, String? sdkKey) async {
-    try {
-      final result = await methodChannel.invokeMethod<bool>(
-        'sendSdkInitEvent',
-        {
-          'sdkInitTime': sdkInitTime.toString(),
-          'accountId': accountId,
-          'sdkKey': sdkKey,
-          'useWingifyApi': useWingifyApi,
-        }, // Send as String for proper type conversion
-      );
-      return result ?? false;
     } on PlatformException catch (e) {
       // Handle errors from the native side
       throw Exception("Error: ${e.code}, ${e.message}");

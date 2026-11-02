@@ -15,7 +15,7 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
         .package(
             url: "https://github.com/wingify/vwo-fme-ios-sdk.git",
-            exact: "1.55.0"
+            exact: "1.68.0"
         ),
     ],
     targets: [

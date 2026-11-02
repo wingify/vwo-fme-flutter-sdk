@@ -30,6 +30,10 @@ class WingifyInitOptions implements FmeInitOptions {
   final int? pollInterval;
   @override
   final int? cachedSettingsExpiryTime;
+  /// Optional: how long a stored getFlag decision is reused, in milliseconds.
+  /// Leave this unset, or pass 0, and the cached decision never expires.
+  @override
+  final int? cachedDecisionExpiryTime;
   @override
   final Function(Map<String, dynamic>)? integrations;
 
@@ -48,6 +52,11 @@ class WingifyInitOptions implements FmeInitOptions {
   /// Optional: if aliasing is enabled
   @override
   bool? isAliasingEnabled;
+
+  /// Optional: also fire the integration callback for decisions served from cache.
+  /// Default false sends it once per distinct payload.
+  @override
+  final bool shouldTriggerIntegrationCallbackAlways;
 
   /// Internal SDK metadata.
   @override
@@ -69,11 +78,13 @@ class WingifyInitOptions implements FmeInitOptions {
     this.gatewayService,
     this.pollInterval,
     this.cachedSettingsExpiryTime,
+    this.cachedDecisionExpiryTime,
     this.integrations,
     this.batchMinSize = -1,
     this.batchUploadTimeInterval = -1,
     this.isUsageStatsDisabled = false,
     this.isAliasingEnabled = false,
+    this.shouldTriggerIntegrationCallbackAlways = false,
   });
 
   @override
@@ -85,11 +96,13 @@ class WingifyInitOptions implements FmeInitOptions {
         'gatewayService: $gatewayService, '
         'pollInterval: $pollInterval, '
         'cachedSettingsExpiryTime: $cachedSettingsExpiryTime, '
+        'cachedDecisionExpiryTime: $cachedDecisionExpiryTime, '
         'integrationCallback: ${integrations != null ? 'Provided' : 'Not Provided'}, '
         'batchMinSize: $batchMinSize, '
         'batchUploadTimeInterval: $batchUploadTimeInterval, '
         'isUsageStatsDisabled: $isUsageStatsDisabled, '
         'isAliasingEnabled: $isAliasingEnabled, '
+        'shouldTriggerIntegrationCallbackAlways: $shouldTriggerIntegrationCallbackAlways, '
         'platformMeta: $platformMeta)';
   }
 }

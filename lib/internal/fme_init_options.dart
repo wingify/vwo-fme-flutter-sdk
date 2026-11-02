@@ -27,11 +27,18 @@ abstract class FmeInitOptions {
   Map<String, String>? get gatewayService;
   int? get pollInterval;
   int? get cachedSettingsExpiryTime;
+
+  /// How long a cached getFlag decision is reused, in milliseconds.
+  /// null or 0 means it never expires. Android forwards a missing value as 0.
+  int? get cachedDecisionExpiryTime;
   Function(Map<String, dynamic>)? get integrations;
   int get batchMinSize;
   int get batchUploadTimeInterval;
   bool get isUsageStatsDisabled;
   bool? get isAliasingEnabled;
+
+  /// Also run the integration callback when getFlag returns a cached decision.
+  bool get shouldTriggerIntegrationCallbackAlways;
 
   /// Internal SDK metadata, sent to native as `_vwo_meta` for both brands.
   Map<String, dynamic> get platformMeta;
